@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Live Customer Support Co-Pilot - AI Voice Agent with Human Takeover">
+  <title>Supervisor Dashboard | Live Support Co-Pilot</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231E40AF'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="header-logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="10" r="1"/>
+            <circle cx="8" cy="10" r="1"/>
+            <circle cx="16" cy="10" r="1"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="header-title">Live Support Co-Pilot</h1>
+          <p class="header-subtitle">Supervisor Dashboard</p>
+        </div>
+      </div>
+      
+      <div class="header-stats">
+        <div class="stat-item">
+          <div class="stat-value active" id="stat-active">0</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value waiting" id="stat-waiting">0</div>
+          <div class="stat-label">Waiting</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value human" id="stat-human">0</div>
+          <div class="stat-label">Human</div>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button class="btn btn-ghost" id="btn-refresh" title="Refresh sessions">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+        <div class="connection-status" id="connection-status">
+          <span class="status-dot"></span>
+          <span class="status-text">Connecting...</span>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Sidebar - Sessions List -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2 class="sidebar-title">Active Sessions</h2>
+      </div>
+      <div class="sessions-list" id="sessions-list">
+        <!-- Sessions will be rendered here -->
+        <div class="empty-state" id="no-sessions">
+          <div class="empty-state-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <h3 class="empty-state-title">No Active Sessions</h3>
+          <p class="empty-state-description">Waiting for customer connections...</p>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Main Content - Conversation View -->
+    <main class="main-content">
+      <div id="conversation-view" style="display: none;">
+        <div class="conversation-header">
+          <div class="conversation-info">
+            <h2 id="session-title">Session</h2>
+            <div class="conversation-mode">
+              <span class="mode-indicator ai" id="mode-indicator"></span>
+              <span id="mode-text">AI Mode</span>
+            </div>
+          </div>
+          <div class="conversation-actions">
+            <button class="btn btn-cta" id="btn-takeover" title="Take over conversation">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Take Over
+            </button>
+            <button class="btn btn-primary" id="btn-handback" style="display: none;" title="Hand back to AI">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+              Hand Back to AI
+            </button>
+          </div>
+        </div>
+        
+        <div class="transcript-container" id="transcript">
+          <!-- Messages will be rendered here -->
+        </div>
+        
+        <div class="audio-controls" id="audio-controls" style="display: none;">
+          <button class="btn btn-icon btn-primary" id="btn-mic" title="Toggle microphone">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
+          <div class="audio-visualizer" id="audio-visualizer">
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+            <div class="audio-bar"></div>
+          </div>
+          <button class="btn btn-danger btn-icon" id="btn-end" title="End session">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7"/>
+              <line x1="23" y1="1" x2="1" y2="23"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Text input for supervisor messages -->
+        <div class="supervisor-input" id="supervisor-input" style="display: none; padding: 1rem 1.5rem; border-top: 1px solid var(--color-border); background: var(--color-surface);">
+          <div style="display: flex; gap: 0.75rem;">
+            <input type="text" id="message-input" placeholder="Type a message to the customer..." 
+              style="flex: 1; background: var(--color-surface-elevated); border: 1px solid var(--color-border); border-radius: 0.5rem; padding: 0.75rem 1rem; color: var(--color-text-primary); font-family: var(--font-sans); font-size: 0.875rem;">
+            <button class="btn btn-primary" id="btn-send">Send</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Empty State -->
+      <div class="empty-state" id="no-selection">
+        <div class="empty-state-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+        </div>
+        <h3 class="empty-state-title">Select a Session</h3>
+        <p class="empty-state-description">Choose a session from the sidebar to view the conversation and manage it.</p>
+      </div>
+    </main>
+    
+    <!-- Detail Panel -->
+    <aside class="detail-panel">
+      <div class="detail-header">
+        <h2 class="detail-title">Session Details</h2>
+      </div>
+      
+      <div id="detail-content">
+        <div class="detail-section">
+          <h3 class="detail-section-title">Session Info</h3>
+          <div class="detail-row">
+            <span class="detail-label">Session ID</span>
+            <span class="detail-value" id="detail-session-id">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Started</span>
+            <span class="detail-value" id="detail-started">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Duration</span>
+            <span class="detail-value" id="detail-duration">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Mode</span>
+            <span class="detail-value" id="detail-mode">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Messages</span>
+            <span class="detail-value" id="detail-messages">-</span>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <h3 class="detail-section-title">Customer</h3>
+          <div class="detail-row">
+            <span class="detail-label">Connected</span>
+            <span class="detail-value" id="detail-customer-status">-</span>
+          </div>
+          
+          <div class="frustration-meter" style="margin-top: 1rem;">
+             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--color-text-secondary);">
+                 <span>Frustration Level</span>
+                 <span id="frustration-value">0%</span>
+             </div>
+             <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                 <div id="frustration-bar" style="width: 0%; height: 100%; background: var(--color-success); transition: width 0.3s, background 0.3s;"></div>
+             </div>
+          </div>
+        </div>
+        
+        <div class="context-input">
+          <h3 class="detail-section-title">Context Injection</h3>
+          <textarea class="context-textarea" id="context-text" placeholder="Enter context for AI to use when handing back..."></textarea>
+          <button class="btn btn-ghost" id="btn-inject" style="margin-top: 0.75rem; width: 100%;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Inject Context
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+  
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+  
+  <script src="/js/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Support | Live Support Co-Pilot</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600&display=swap');
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Fira Sans', sans-serif;
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a24 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    
+    .chat-widget {
+      width: 100%;
+      max-width: 420px;
+      height: 600px;
+      background: #12121a;
+      border-radius: 1rem;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    
+    .chat-header {
+      padding: 1rem 1.25rem;
+      background: linear-gradient(135deg, #1E40AF, #3B82F6);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .chat-logo {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .chat-logo svg {
+      width: 24px;
+      height: 24px;
+      color: white;
+    }
+    
+    .chat-title {
+      flex: 1;
+    }
+    
+    .chat-title h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .chat-title p {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .mode-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .mode-badge.ai {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10B981;
+    }
+    
+    .mode-badge.human {
+      background: rgba(245, 158, 11, 0.2);
+      color: #F59E0B;
+    }
+    
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .message {
+      max-width: 85%;
+      padding: 0.75rem 1rem;
+      border-radius: 1rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    
+    .message.customer {
+      align-self: flex-end;
+      background: #1E40AF;
+      color: white;
+      border-bottom-right-radius: 0.25rem;
+    }
+    
+    .message.ai, .message.supervisor {
+      align-self: flex-start;
+      background: #1a1a24;
+      color: #F8FAFC;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-bottom-left-radius: 0.25rem;
+    }
+    
+    .message.supervisor {
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    
+    .message-sender {
+      font-size: 0.65rem;
+      color: #64748B;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .input-area {
+      padding: 1rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .input-area input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      background: #1a1a24;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 0.5rem;
+      color: #F8FAFC;
+      font-family: inherit;
+      font-size: 0.875rem;
+    }
+    
+    .input-area input:focus {
+      outline: none;
+      border-color: #1E40AF;
+    }
+    
+    .input-area input::placeholder {
+      color: #64748B;
+    }
+    
+    .btn {
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: #1E40AF;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #3B82F6;
+    }
+    
+    .btn-mic {
+      background: #1a1a24;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #94A3B8;
+    }
+    
+    .btn-mic:hover {
+      background: #22222e;
+    }
+    
+    .btn-mic.recording {
+      background: #EF4444;
+      border-color: #EF4444;
+      color: white;
+      animation: pulse 1s infinite;
+    }
+    
+    .btn svg {
+      width: 20px;
+      height: 20px;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .connecting {
+      text-align: center;
+      color: #64748B;
+      padding: 2rem;
+    }
+    
+    .connecting .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #3B82F6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .system-message {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #64748B;
+      padding: 0.5rem 1rem;
+      background: rgba(100, 116, 139, 0.1);
+      border-radius: 0.5rem;
+      margin: 0.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-widget">
+    <div class="chat-header">
+      <div class="chat-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div class="chat-title">
+        <h1>Customer Support</h1>
+        <p>We're here to help!</p>
+      </div>
+      <span class="mode-badge ai" id="mode-badge">AI Assistant</span>
+    </div>
+    
+    <div class="messages" id="messages">
+      <div class="connecting" id="connecting">
+        <div class="spinner"></div>
+        <p>Connecting to support...</p>
+      </div>
+    </div>
+    
+    <div class="input-area">
+      <button class="btn btn-mic" id="btn-mic" title="Voice message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <input type="text" id="message-input" placeholder="Type your message...">
+      <button class="btn btn-primary" id="btn-send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { AudioManager } from '/js/audio-manager.js';
+
+    class CustomerWidget {
+      constructor() {
+        this.ws = null;
+        this.sessionId = null;
+        this.mode = 'ai';
+        this.audioManager = new AudioManager();
+        
+        this.init();
+      }
+      
+      init() {
+        this.messagesEl = document.getElementById('messages');
+        this.connectingEl = document.getElementById('connecting');
+        this.inputEl = document.getElementById('message-input');
+        this.btnSend = document.getElementById('btn-send');
+        this.btnMic = document.getElementById('btn-mic');
+        this.modeBadge = document.getElementById('mode-badge');
+        
+        this.btnSend.addEventListener('click', () => this.sendMessage());
+        this.inputEl.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') this.sendMessage();
+        });
+        this.btnMic.addEventListener('click', () => this.toggleMic());
+        
+        this.connect();
+      }
+      
+      connect() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        this.ws = new WebSocket(`${protocol}//${window.location.host}?role=customer`);
+        
+        this.ws.onopen = () => {
+          console.log('Connected to support');
+          this.connectingEl.style.display = 'none';
+          this.addSystemMessage('Connected! How can we help you today?');
+        };
+        
+        this.ws.onclose = () => {
+          console.log('Disconnected');
+          this.addSystemMessage('Connection lost. Reconnecting...');
+          setTimeout(() => this.connect(), 3000);
+        };
+        
+        this.ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          this.handleMessage(data);
+        };
+      }
+      
+      handleMessage(data) {
+        switch (data.type) {
+          case 'session_init':
+            this.sessionId = data.sessionId;
+            this.mode = data.mode;
+            this.updateModeBadge();
+            break;
+            
+          case 'ai_response':
+            if (data.data.type === 'text') {
+              this.addMessage('ai', data.data.content);
+            }
+            break;
+            
+          case 'supervisor_message':
+            this.addMessage('supervisor', data.content);
+            break;
+            
+          case 'mode_change':
+            this.mode = data.mode;
+            this.updateModeBadge();
+            this.addSystemMessage(data.message);
+            break;
+            
+          case 'audio':
+            // Play received PCM audio
+            const pcmData = this.base64ToInt16(data.data);
+            this.audioManager.playAudio(pcmData);
+            break;
+        }
+      }
+      
+      sendMessage() {
+        const text = this.inputEl.value.trim();
+        if (!text || !this.ws) return;
+        
+        this.ws.send(JSON.stringify({
+          type: 'text',
+          content: text
+        }));
+        
+        this.addMessage('customer', text);
+        this.inputEl.value = '';
+      }
+      
+      async toggleMic() {
+        if (this.audioManager.isRecording) {
+            // Stop recording
+            this.audioManager.stopRecording();
+            this.btnMic.classList.remove('recording');
+            
+            // Stop Speech Recognition
+            if (this.recognition) {
+              this.recognition.stop();
+              this.recognition = null;
+            }
+        } else {
+            // Start recording
+            this.btnMic.classList.add('recording');
+            
+            // Start Speech Recognition if available
+            if ('webkitSpeechRecognition' in window) {
+                this.recognition = new webkitSpeechRecognition();
+                this.recognition.continuous = true;
+                this.recognition.interimResults = false; // Only want final results
+                this.recognition.lang = 'en-US';
+                
+                // Track the last processed result index to avoid duplicates
+                this.lastResultIndex = 0;
+                
+                this.recognition.onresult = (event) => {
+                    // Iterate ONLY over new results
+                    for (let i = this.lastResultIndex; i < event.results.length; ++i) {
+                         if (event.results[i].isFinal) {
+                             const transcript = event.results[i][0].transcript.trim();
+                             if (transcript && this.ws) {
+                                console.log('Final Transcript:', transcript);
+                                this.ws.send(JSON.stringify({
+                                    type: 'transcript',
+                                    content: transcript
+                                }));
+                                this.addMessage('customer', transcript);
+                             }
+                         }
+                    }
+                    this.lastResultIndex = event.results.length;
+                };
+
+                this.recognition.onend = () => {
+                     // If still recording, restart recognition
+                     if (this.audioManager.isRecording && this.recognition) {
+                         try {
+                             this.recognition.start();
+                         } catch(e) { /* ignore */ }
+                     }
+                };
+                
+                try {
+                    this.recognition.start();
+                } catch (e) {
+                    console.error('Speech recognition failed to start:', e);
+                }
+            }
+            
+            await this.audioManager.startRecording((pcmData) => {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: 'audio',
+                        data: this.int16ToBase64(pcmData)
+                    }));
+                }
+            });
+        }
+      }
+      
+      addMessage(role, content) {
+        // If content is just audio signal or empty, don't show empty bubble
+        if (!content) return;
+
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        
+        if (role !== 'customer') {
+          const sender = document.createElement('div');
+          sender.className = 'message-sender';
+          sender.textContent = role === 'ai' ? 'AI Assistant' : 'Support Agent';
+          div.appendChild(sender);
+        }
+        
+        const text = document.createElement('div');
+        text.textContent = content;
+        div.appendChild(text);
+        
+        this.messagesEl.appendChild(div);
+        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+      }
+      
+      addSystemMessage(message) {
+        const div = document.createElement('div');
+        div.className = 'system-message';
+        div.textContent = message;
+        this.messagesEl.appendChild(div);
+        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+      }
+      
+      updateModeBadge() {
+        this.modeBadge.className = `mode-badge ${this.mode}`;
+        this.modeBadge.textContent = this.mode === 'ai' ? 'AI Assistant' : 'Human Agent';
+      }
+
+      // Utils
+      int16ToBase64(int16Array) {
+        const bytes = new Uint8Array(int16Array.buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+      }
+
+      base64ToInt16(base64) {
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binary_string.charCodeAt(i);
+        }
+        return new Int16Array(bytes.buffer);
+      }
+    }
+    
+    new CustomerWidget();
+  </script>
+</body>
+</html>
