@@ -352,6 +352,10 @@ class SupervisorDashboard {
   renderSessionDetails(session) {
     if (!session) return;
 
+    // Show panel content
+    const detailContent = document.getElementById("detail-content");
+    if (detailContent) detailContent.style.display = "block";
+
     // Update header
     this.sessionTitle.textContent = `Session ${session.id.substring(0, 8)}`;
 
@@ -382,7 +386,10 @@ class SupervisorDashboard {
 
   async fetchTranscript(sessionId) {
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`);
+      const host = window.location.hostname;
+      const response = await fetch(
+        `http://${host}:3000/api/sessions/${sessionId}`,
+      );
       if (!response.ok) throw new Error("Failed to fetch session");
 
       const session = await response.json();
@@ -592,8 +599,9 @@ class SupervisorDashboard {
       this.ws.send(JSON.stringify({ type: "get_sessions" }));
     }
 
-    // Also fetch via REST
-    fetch("/api/sessions")
+    // Also fetch via REST from backend (Port 3000)
+    const host = window.location.hostname;
+    fetch(`http://${host}:3000/api/sessions`)
       .then((res) => res.json())
       .then((sessions) => this.updateSessionsList(sessions))
       .catch((err) => console.error("Error fetching sessions:", err));

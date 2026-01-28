@@ -4,6 +4,36 @@ import { Logger } from "@gemini-copilot/shared";
 
 const logger = new Logger("GeminiLive");
 
+/**
+ * Check if text is English-only (Latin characters, numbers, punctuation)
+ * Returns false if text contains Devanagari, Gujarati, or other non-Latin scripts
+ */
+function isEnglishText(text) {
+  if (!text) return false;
+
+  // Regex pattern for non-English scripts (Devanagari, Gujarati, etc.)
+  // This matches Hindi, Gujarati, Bengali, Tamil, Telugu, and other Indic scripts
+  const nonLatinPattern =
+    /[\u0900-\u097F\u0A80-\u0AFF\u0980-\u09FF\u0B00-\u0B7F\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F]/;
+
+  // If text contains non-Latin characters, reject it
+  if (nonLatinPattern.test(text)) {
+    logger.debug(`Rejected non-English text: "${text.substring(0, 50)}..."`);
+    return false;
+  }
+
+  // Also check if at least 50% of the text is Latin letters
+  const latinChars = text.match(/[a-zA-Z]/g) || [];
+  const totalChars = text.replace(/\s/g, "").length;
+
+  if (totalChars > 0 && latinChars.length / totalChars < 0.3) {
+    logger.debug(`Rejected low-Latin text: "${text.substring(0, 50)}..."`);
+    return false;
+  }
+
+  return true;
+}
+
 export class GeminiLiveSession extends EventEmitter {
   constructor(apiKey) {
     super();
@@ -15,14 +45,30 @@ export class GeminiLiveSession extends EventEmitter {
     this.host = "generativelanguage.googleapis.com";
     this.uri = `wss://${this.host}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
 
-    this.systemInstruction = `You are a helpful, professional customer support AI assistant.
-      Your role is to:
-      - Answer customer questions accurately and helpfully
-      - Be friendly, patient, and empathic
-      - Escalate complex issues to human supervisors when appropriate.
-      - Speak clearly and concisely.
-      - IMPORTANT: Do NOT output your internal thought process, monologue, or reasoning. Only output the final response to the user.
-    `;
+    this.systemInstruction = `You are Kora, a friendly and professional customer support AI assistant.
+
+CRITICAL OUTPUT RULES (MUST FOLLOW):
+- You are SPEAKING directly to a customer via voice.
+- Output ONLY the words you want the customer to HEAR.
+- NEVER include thoughts, reasoning, actions, or metadata in your output.
+- NEVER use formatting like "**Acknowledge**", "[Action]", "My next step is...", or "I will...".
+- NEVER explain what you are doing or thinking.
+- Just speak naturally as if you are on a phone call.
+
+LANGUAGE: Always respond in English only.
+
+EXAMPLE OF WRONG OUTPUT (DO NOT DO THIS):
+"**Acknowledge and Prompt** I'm noting the user's Hello. I will offer assistance."
+
+EXAMPLE OF CORRECT OUTPUT (DO THIS):
+"Hello! How can I help you today?"
+
+YOUR BEHAVIOR:
+- Be warm, helpful, and patient.
+- Ask clarifying questions when needed.
+- Keep responses concise and conversational.
+- If you don't know something, say so politely.
+`;
   }
 
   /**
@@ -66,6 +112,10 @@ export class GeminiLiveSession extends EventEmitter {
    * Send initial setup message (Handshake)
    */
   setupSession() {
+    // Buffer to aggregate partial transcriptions
+    this.pendingInputTranscription = "";
+    this.transcriptionTimeout = null;
+
     const setupMessage = {
       setup: {
         model: `models/${this.model}`,
@@ -82,9 +132,13 @@ export class GeminiLiveSession extends EventEmitter {
         system_instruction: {
           parts: [{ text: this.systemInstruction }],
         },
+        // Enable transcription at setup level
+        input_audio_transcription: {},
+        output_audio_transcription: {},
       },
     };
 
+    logger.info("Sending setup message to Gemini Live API");
     this.sendJson(setupMessage);
   }
 
@@ -145,7 +199,7 @@ export class GeminiLiveSession extends EventEmitter {
         response = JSON.parse(data);
       }
 
-      // Handle ServeContent (Audio/Text)
+      // Handle ServerContent (Audio/Text)
       if (response.serverContent) {
         const content = response.serverContent;
 
@@ -153,25 +207,97 @@ export class GeminiLiveSession extends EventEmitter {
         if (content.modelTurn) {
           const parts = content.modelTurn.parts;
           for (const part of parts) {
+            // Handle inline text (if sent)
             if (part.text) {
+              logger.info(`AI Text: "${part.text.substring(0, 100)}..."`);
               this.emit("response", { type: "text", content: part.text });
             }
+            // Handle audio data
             if (
               part.inlineData &&
               part.inlineData.mimeType.startsWith("audio/")
             ) {
-              // Emit audio data (Base64)
-              logger.debug(
-                `Received audio chunk: ${part.inlineData.data.length} bytes`,
-              );
+              logger.debug(`Audio chunk: ${part.inlineData.data.length} bytes`);
               this.emit("audio", part.inlineData.data);
             }
           }
         }
 
+        // Handle audio transcription (text version of what AI speaks)
+        if (content.outputAudioTranscription) {
+          const transcriptionText = content.outputAudioTranscription.text;
+          if (transcriptionText) {
+            logger.info(
+              `AI Transcription: "${transcriptionText.substring(0, 100)}..."`,
+            );
+            this.emit("response", { type: "text", content: transcriptionText });
+          }
+        }
+
+        // Handle input transcription (customer's speech transcribed by Gemini)
+        // Buffer partial transcriptions to form complete sentences
+        if (content.inputTranscription) {
+          const customerText = content.inputTranscription.text;
+          // Only process English text - reject Hindi/Gujarati/etc.
+          if (customerText && isEnglishText(customerText)) {
+            // Append to pending transcription buffer
+            if (this.pendingInputTranscription) {
+              this.pendingInputTranscription += " " + customerText;
+            } else {
+              this.pendingInputTranscription = customerText;
+            }
+
+            // Clear existing timeout
+            if (this.transcriptionTimeout) {
+              clearTimeout(this.transcriptionTimeout);
+            }
+
+            // Set a debounce timeout - emit after 800ms of no new words
+            this.transcriptionTimeout = setTimeout(() => {
+              if (this.pendingInputTranscription) {
+                const completeText = this.pendingInputTranscription.trim();
+                // Final English check before emitting
+                if (isEnglishText(completeText)) {
+                  logger.info(`Customer (English): "${completeText}"`);
+                  this.emit("input_transcription", { text: completeText });
+                } else {
+                  logger.info(
+                    `Rejected non-English sentence: "${completeText.substring(0, 50)}..."`,
+                  );
+                }
+                this.pendingInputTranscription = "";
+              }
+            }, 800);
+          }
+        }
+
         if (content.turnComplete) {
+          logger.info("Turn complete");
+          // Flush any pending transcription on turn complete
+          if (this.pendingInputTranscription) {
+            const completeText = this.pendingInputTranscription.trim();
+            // Final English check before emitting
+            if (isEnglishText(completeText)) {
+              logger.info(`Customer (flushed): "${completeText}"`);
+              this.emit("input_transcription", { text: completeText });
+            } else {
+              logger.info(
+                `Rejected non-English (flushed): "${completeText.substring(0, 50)}..."`,
+              );
+            }
+            this.pendingInputTranscription = "";
+            if (this.transcriptionTimeout) {
+              clearTimeout(this.transcriptionTimeout);
+              this.transcriptionTimeout = null;
+            }
+          }
           this.emit("turn_complete");
         }
+      }
+
+      // Handle setup complete
+      if (response.setupComplete) {
+        logger.info("Gemini session setup complete");
       }
 
       // Handle Tool Calls (Not implemented for this demo but good for future)

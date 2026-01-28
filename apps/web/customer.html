@@ -314,7 +314,15 @@
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         // Use explicit 3000 port for backend connection
         const host = window.location.hostname;
-        this.ws = new WebSocket(`${protocol}//${host}:3000?role=customer`);
+        
+        // Reuse existing session ID if available (from sessionStorage)
+        let wsUrl = `${protocol}//${host}:3000?role=customer`;
+        const existingSessionId = sessionStorage.getItem('gemini_session_id');
+        if (existingSessionId) {
+            wsUrl += `&session=${existingSessionId}`;
+        }
+        
+        this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
           console.log('Connected to support');
@@ -338,6 +346,7 @@
         switch (data.type) {
           case 'session_init':
             this.sessionId = data.sessionId;
+            sessionStorage.setItem('gemini_session_id', this.sessionId);
             this.mode = data.mode;
             this.updateModeBadge();
             break;
@@ -346,6 +355,11 @@
             if (data.data.type === 'text') {
               this.addMessage('ai', data.data.content);
             }
+            break;
+          
+          // Handle customer speech transcribed by Gemini (server-side)
+          case 'customer_transcription':
+            this.addMessage('customer', data.content);
             break;
             
           case 'supervisor_message':
@@ -398,7 +412,7 @@
             if ('webkitSpeechRecognition' in window) {
                 this.recognition = new webkitSpeechRecognition();
                 this.recognition.continuous = true;
-                this.recognition.interimResults = false; // Only want final results
+                this.recognition.interimResults = true; // Show interim results for visual feedback
                 this.recognition.lang = 'en-US';
                 
                 // Track the last processed result index to avoid duplicates
@@ -410,16 +424,31 @@
                          if (event.results[i].isFinal) {
                              const transcript = event.results[i][0].transcript.trim();
                              if (transcript && this.ws) {
-                                console.log('Final Transcript:', transcript);
+                                console.log('✅ Final Transcript:', transcript);
                                 this.ws.send(JSON.stringify({
                                     type: 'transcript',
                                     content: transcript
                                 }));
                                 this.addMessage('customer', transcript);
                              }
+                         } else {
+                             // Interim result - log for debugging
+                             const interim = event.results[i][0].transcript.trim();
+                             if (interim) {
+                                 console.log('🎤 Hearing:', interim);
+                             }
                          }
                     }
                     this.lastResultIndex = event.results.length;
+                };
+                
+                this.recognition.onerror = (event) => {
+                    console.error('❌ Speech Recognition Error:', event.error);
+                    if (event.error === 'not-allowed') {
+                        this.addSystemMessage('Microphone access denied. Please allow microphone access.');
+                    } else if (event.error === 'no-speech') {
+                        console.log('🔇 No speech detected');
+                    }
                 };
 
                 this.recognition.onend = () => {
@@ -433,9 +462,13 @@
                 
                 try {
                     this.recognition.start();
+                    console.log('🎙️ Speech recognition started');
                 } catch (e) {
                     console.error('Speech recognition failed to start:', e);
                 }
+            } else {
+                console.warn('⚠️ Speech recognition not supported in this browser');
+                this.addSystemMessage('Speech-to-text not supported. Please use Chrome.');
             }
             
             await this.audioManager.startRecording((pcmData) => {

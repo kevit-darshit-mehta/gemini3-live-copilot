@@ -25,6 +25,18 @@ const conversationManager = new ConversationManager();
 
 // Middleware
 app.use(express.json());
+
+// CORS Middleware
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.static(join(__dirname, "../public")));
 
 // API Routes
@@ -135,6 +147,33 @@ function handleCustomerConnection(ws, sessionId) {
           }),
         );
       }
+    });
+
+    // Handle customer speech transcribed by Gemini (input_audio_transcription)
+    geminiSession.on("input_transcription", (data) => {
+      // Forward to customer so they see their own speech
+      if (session.customerWs?.readyState === 1) {
+        session.customerWs.send(
+          JSON.stringify({
+            type: "customer_transcription",
+            content: data.text,
+          }),
+        );
+      }
+
+      // Broadcast to supervisors
+      broadcastToSupervisors({
+        type: "customer_message",
+        sessionId: sessionId,
+        content: data.text,
+      });
+
+      // Store in transcript
+      session.transcript.push({
+        role: "customer",
+        content: data.text,
+        timestamp: Date.now(),
+      });
     });
 
     geminiSession.on("error", (error) => {
@@ -285,16 +324,12 @@ function handleCustomerConnection(ws, sessionId) {
           data: conversationManager.getSession(sessionId),
         });
 
-        // Forward to supervisor so they can see what was said
-        if (session.supervisorWs?.readyState === 1) {
-          session.supervisorWs.send(
-            JSON.stringify({
-              type: "customer_message",
-              sessionId: sessionId,
-              content: data.content,
-            }),
-          );
-        }
+        // Broadcast customer message to ALL supervisors
+        broadcastToSupervisors({
+          type: "customer_message",
+          sessionId: sessionId,
+          content: data.content,
+        });
       }
     } catch (error) {
       logger.error("Error processing customer message:", error);
