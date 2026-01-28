@@ -1,16 +1,13 @@
-/**
- * Live Customer Support Co-Pilot - Main Server
- * Gemini 3 AI Voice Agent with Human Takeover
- */
-
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import crypto from "crypto";
 import { GeminiLiveSession } from "./gemini-live.js";
 import { ConversationManager } from "./conversation-manager.js";
+import Logger from "./logger.js";
 
 // Load environment variables
 config();
@@ -18,6 +15,7 @@ config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const logger = new Logger("Server");
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
@@ -56,7 +54,7 @@ wss.on("connection", (ws, req) => {
   const role = url.searchParams.get("role") || "customer";
   const sessionId = url.searchParams.get("session") || crypto.randomUUID();
 
-  console.log(`[WS] New connection: role=${role}, session=${sessionId}`);
+  logger.info(`New connection: role=${role}, session=${sessionId}`);
 
   // Handle different connection types
   if (role === "customer") {
@@ -91,7 +89,7 @@ function handleCustomerConnection(ws, sessionId) {
 
     // Initialize session
     geminiSession.initialize().catch((err) => {
-      console.error("Failed to initialize Gemini session", err);
+      logger.error("Failed to initialize Gemini session", err);
     });
 
     // Set up Gemini event handlers
@@ -140,7 +138,7 @@ function handleCustomerConnection(ws, sessionId) {
     });
 
     geminiSession.on("error", (error) => {
-      console.error(`[Gemini] Error in session ${sessionId}:`, error);
+      logger.error(`Error in session ${sessionId}:`, error);
       // Notify supervisor
       if (session.supervisorWs?.readyState === 1) {
         session.supervisorWs.send(
@@ -213,8 +211,8 @@ function handleCustomerConnection(ws, sessionId) {
 
         // If escalation needed, notify supervisor
         if (escalationCheck.shouldEscalate) {
-          console.log(
-            `[Sentiment] Escalation triggered for session ${sessionId}: ${escalationCheck.reason}`,
+          logger.warn(
+            `Escalation triggered for session ${sessionId}: ${escalationCheck.reason}`,
           );
           broadcastToSupervisors({
             type: "escalation_alert",
@@ -299,12 +297,12 @@ function handleCustomerConnection(ws, sessionId) {
         }
       }
     } catch (error) {
-      console.error("[WS] Error processing customer message:", error);
+      logger.error("Error processing customer message:", error);
     }
   });
 
   ws.on("close", () => {
-    console.log(`[WS] Customer disconnected from session ${sessionId}`);
+    logger.info(`Customer disconnected from session ${sessionId}`);
     session.customerWs = null;
     conversationManager.updateSession(sessionId, { customerConnected: false });
 
@@ -329,8 +327,8 @@ function handleCustomerConnection(ws, sessionId) {
  * Handle supervisor WebSocket connection
  */
 function handleSupervisorConnection(ws, targetSessionId) {
-  console.log(
-    `[WS] Supervisor connected, targeting session: ${targetSessionId || "all"}`,
+  logger.info(
+    `Supervisor connected, targeting session: ${targetSessionId || "all"}`,
   );
 
   // Add to supervisor list
@@ -362,7 +360,7 @@ function handleSupervisorConnection(ws, targetSessionId) {
       switch (data.type) {
         case "takeover":
           // Human takeover
-          console.log(`[Supervisor] Taking over session ${data.sessionId}`);
+          logger.info(`Taking over session ${data.sessionId}`);
           session.mode = "human";
           session.supervisorWs = ws;
           session.supervisorId = data.supervisorId;
@@ -396,9 +394,7 @@ function handleSupervisorConnection(ws, targetSessionId) {
 
         case "handback":
           // Hand back to AI
-          console.log(
-            `[Supervisor] Handing back session ${data.sessionId} to AI`,
-          );
+          logger.info(`Handing back session ${data.sessionId} to AI`);
           session.mode = "ai";
           session.supervisorWs = null;
           session.supervisorId = null;
@@ -479,7 +475,7 @@ function handleSupervisorConnection(ws, targetSessionId) {
           break;
       }
     } catch (error) {
-      console.error("[WS] Error processing supervisor message:", error);
+      logger.error("Error processing supervisor message:", error);
       ws.send(
         JSON.stringify({
           type: "error",
@@ -490,7 +486,7 @@ function handleSupervisorConnection(ws, targetSessionId) {
   });
 
   ws.on("close", () => {
-    console.log("[WS] Supervisor disconnected");
+    logger.info("Supervisor disconnected");
     conversationManager.removeSupervisor(ws);
   });
 }
@@ -512,13 +508,6 @@ function broadcastToSupervisors(message) {
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║     🎧 Live Customer Support Co-Pilot                     ║
-║     Gemini 3 AI Voice Agent with Human Takeover           ║
-╠═══════════════════════════════════════════════════════════╣
-║     Server running on http://localhost:${PORT}              ║
-║     WebSocket available at ws://localhost:${PORT}           ║
-╚═══════════════════════════════════════════════════════════╝
-  `);
+  logger.info(`Server running on http://localhost:${PORT}`);
+  logger.info(`WebSocket available at ws://localhost:${PORT}`);
 });

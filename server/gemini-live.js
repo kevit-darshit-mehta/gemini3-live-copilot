@@ -1,10 +1,8 @@
-/**
- * Gemini Live API Session Handler
- * Handles real-time audio/text communication with Gemini 2.0 via WebSocket
- */
-
 import { WebSocket } from "ws";
 import { EventEmitter } from "events";
+import Logger from "./logger.js";
+
+const logger = new Logger("GeminiLive");
 
 export class GeminiLiveSession extends EventEmitter {
   constructor(apiKey) {
@@ -36,7 +34,7 @@ export class GeminiLiveSession extends EventEmitter {
         this.ws = new WebSocket(this.uri);
 
         this.ws.on("open", () => {
-          console.log("[Gemini] Connected to Live API");
+          logger.info("Connected to Live API");
           this.isActive = true;
           this.setupSession();
           resolve(true);
@@ -47,18 +45,18 @@ export class GeminiLiveSession extends EventEmitter {
         });
 
         this.ws.on("error", (error) => {
-          console.error("[Gemini] WebSocket error:", error);
+          logger.error("WebSocket error:", error);
           this.emit("error", error);
           reject(error);
         });
 
         this.ws.on("close", (code, reason) => {
-          console.log(`[Gemini] Disconnected: ${code} - ${reason}`);
+          logger.info(`Disconnected: ${code} - ${reason}`);
           this.isActive = false;
           this.emit("closed");
         });
       } catch (error) {
-        console.error("[Gemini] Connection failed:", error);
+        logger.error("Connection failed:", error);
         reject(error);
       }
     });
@@ -163,8 +161,8 @@ export class GeminiLiveSession extends EventEmitter {
               part.inlineData.mimeType.startsWith("audio/")
             ) {
               // Emit audio data (Base64)
-              console.log(
-                `[Gemini] Received audio chunk: ${part.inlineData.data.length} bytes`,
+              logger.debug(
+                `Received audio chunk: ${part.inlineData.data.length} bytes`,
               );
               this.emit("audio", part.inlineData.data);
             }
@@ -178,10 +176,10 @@ export class GeminiLiveSession extends EventEmitter {
 
       // Handle Tool Calls (Not implemented for this demo but good for future)
       if (response.toolCall) {
-        console.log("Tool call received:", response.toolCall);
+        logger.info("Tool call received:", response.toolCall);
       }
     } catch (error) {
-      console.error("[Gemini] Error parsing message:", error);
+      logger.error("Error parsing message:", error);
     }
   }
 
@@ -195,7 +193,7 @@ export class GeminiLiveSession extends EventEmitter {
    * Inject context into the conversation (e.g. from Supervisor)
    */
   async injectContext(contextMessage) {
-    console.log("[Gemini] Injecting context:", contextMessage);
+    logger.info("Injecting context:", contextMessage);
     const contextPrompt = `
     [SYSTEM UPDATE - SUPERVISOR HANDOFF]
     The human supervisor has handed the conversation back to you with the following note:
