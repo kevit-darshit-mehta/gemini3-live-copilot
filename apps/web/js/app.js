@@ -87,7 +87,9 @@ class SupervisorDashboard {
 
   connectWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}?role=supervisor`;
+    // Use explicit 3000 port for backend connection
+    const host = window.location.hostname;
+    const wsUrl = `${protocol}//${host}:3000?role=supervisor`;
 
     this.ws = new WebSocket(wsUrl);
 

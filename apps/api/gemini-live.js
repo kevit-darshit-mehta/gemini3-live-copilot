@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 import { EventEmitter } from "events";
-import Logger from "./logger.js";
+import { Logger } from "@gemini-copilot/shared";
 
 const logger = new Logger("GeminiLive");
 

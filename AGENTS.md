@@ -15,32 +15,31 @@
 ## 2. Tech Stack Setup
 
 - **Runtime**: Node.js (v20+)
-- **Server**: Express.js + `ws` (WebSocket)
+- **Server**: Express.js + `ws` (WebSocket) (Backend)
 - **AI Model**: `gemini-2.5-flash-native-audio-latest`
 - **Frontend**: Vanilla JS (ES6+), HTML5 AudioContext
 - **Styling**: Native CSS (Glassmorphism, Dark Mode) - _No framework_
+- **Architecture**: Monorepo with NPM Workspaces
 
 ## 3. Project Structure
 
 ```text
 /
-├── server/
-│   ├── index.js              # Main entry point, WebSocket routing
-│   ├── gemini-live.js        # Gemini API session handler
-│   ├── sentiment-analyzer.js # Sentiment logic & escalation rules
-│   ├── conversation-manager.js # Session state management
-│   └── logger.js             # Structured logging utility
-├── public/
-│   ├── customer.html         # Customer voice interface
-│   ├── index.html            # Supervisor dashboard
-│   └── js/                   # Frontend logic (audio-manager, app)
-└── tests/                    # End-to-end verification scripts
+├── apps/
+│   ├── api/                  # Backend Service (Express + WebSocket)
+│   │   ├── index.js          # Entry point
+│   │   └── gemini-live.js    # Gemini Session Logic
+│   └── web/                  # Frontend UI (Static Files)
+│       ├── customer.html     # Customer Interface
+│       └── index.html        # Supervisor Dashboard
+├── packages/
+│   └── shared/               # Shared Utilities (Logger, Types)
+└── package.json              # Workspace Root
 ```
 
 ## 4. Development Standards
 
-- **Logging**: **MUST** use `server/logger.js`. **DO NOT** use `console.log` in server code.
-  - usage: `logger.info("message")`, `logger.error("msg", err)`
+- **Logging**: **MUST** use `Logger` from `@gemini-copilot/shared`. **DO NOT** use `console.log`.
 - **Error Handling**: All async operations (especially API calls/WebSockets) must be wrapped in `try/catch`.
 - **Formatting**: Use Prettier standard.
 - **Comments**: Add JSDoc to all exported classes and major functions.
@@ -61,7 +60,7 @@ This project utilizes a multi-agent orchestration pattern:
 ### B. Sentiment Supervisor Agent (Secondary)
 
 - **Role**: Quality Assurance
-- **Mechanism**: `server/sentiment-analyzer.js`
+- **Mechanism**: `server/sentiment-analyzer.js` (in api)
 - **Logic**:
   - Scores transcript text (-5 to +5).
   - Triggers `escalation_alert` if frustration > 80% or persistent negativity.

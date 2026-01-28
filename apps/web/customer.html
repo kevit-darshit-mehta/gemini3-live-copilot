@@ -312,7 +312,9 @@
       
       connect() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        this.ws = new WebSocket(`${protocol}//${window.location.host}?role=customer`);
+        // Use explicit 3000 port for backend connection
+        const host = window.location.hostname;
+        this.ws = new WebSocket(`${protocol}//${host}:3000?role=customer`);
         
         this.ws.onopen = () => {
           console.log('Connected to support');

@@ -1,0 +1,11 @@
+{
+  "name": "@gemini-copilot/web",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve -l 8080 ."
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
+}

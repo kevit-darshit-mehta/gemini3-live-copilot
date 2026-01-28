@@ -7,7 +7,7 @@ import { dirname, join } from "path";
 import crypto from "crypto";
 import { GeminiLiveSession } from "./gemini-live.js";
 import { ConversationManager } from "./conversation-manager.js";
-import Logger from "./logger.js";
+import { Logger } from "@gemini-copilot/shared";
 
 // Load environment variables
 config();
