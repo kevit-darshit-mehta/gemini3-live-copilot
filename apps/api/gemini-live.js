@@ -132,7 +132,7 @@ YOUR BEHAVIOR:
         system_instruction: {
           parts: [{ text: this.systemInstruction }],
         },
-        // Enable transcription at setup level
+        // Enable transcription - empty objects as per API spec
         input_audio_transcription: {},
         output_audio_transcription: {},
       },
@@ -206,12 +206,17 @@ YOUR BEHAVIOR:
         // Handle Model Turn (Output)
         if (content.modelTurn) {
           const parts = content.modelTurn.parts;
+
           for (const part of parts) {
-            // Handle inline text (if sent)
+            // Handle text output
+            // NOTE: The 'thought' field is always present in Gemini Live AUDIO mode
+            // So we emit all text, which includes AI's thinking/reasoning
+            // This is the only text available since outputAudioTranscription doesn't work
             if (part.text) {
               logger.info(`AI Text: "${part.text.substring(0, 100)}..."`);
               this.emit("response", { type: "text", content: part.text });
             }
+
             // Handle audio data
             if (
               part.inlineData &&
@@ -224,6 +229,7 @@ YOUR BEHAVIOR:
         }
 
         // Handle audio transcription (text version of what AI speaks)
+        // NOTE: This doesn't seem to work with current Gemini Live API config
         if (content.outputAudioTranscription) {
           const transcriptionText = content.outputAudioTranscription.text;
           if (transcriptionText) {

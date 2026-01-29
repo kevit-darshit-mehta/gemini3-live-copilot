@@ -61,7 +61,19 @@ app.get("/api/sessions/:id", (req, res) => {
   if (!session) {
     return res.status(404).json({ error: "Session not found" });
   }
-  res.json(session);
+
+  // Create serializable copy without WebSocket/Gemini objects (which have circular refs)
+  const serializableSession = {
+    id: session.id,
+    mode: session.mode,
+    transcript: session.transcript,
+    sentimentScore: session.sentimentScore,
+    frustrationLevel: session.frustrationLevel,
+    createdAt: session.createdAt,
+    lastActivity: session.lastActivity,
+  };
+
+  res.json(serializableSession);
 });
 
 // ========================================
@@ -188,15 +200,13 @@ function handleCustomerConnection(ws, sessionId) {
         );
       }
 
-      // Also forward to supervisor if connected
-      if (session.supervisorWs?.readyState === 1 && data.type === "text") {
-        session.supervisorWs.send(
-          JSON.stringify({
-            type: "ai_response",
-            sessionId: sessionId,
-            data: { type: "text", content: data.content },
-          }),
-        );
+      // Broadcast to ALL supervisors (not just session.supervisorWs)
+      if (data.type === "text") {
+        broadcastToSupervisors({
+          type: "ai_response",
+          sessionId: sessionId,
+          data: { type: "text", content: data.content },
+        });
       }
 
       // Store in transcript
