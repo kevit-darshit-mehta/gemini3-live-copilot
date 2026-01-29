@@ -53,6 +53,7 @@ class SupervisorDashboard {
     this.supervisorInput = document.getElementById("supervisor-input");
     this.messageInput = document.getElementById("message-input");
     this.btnSend = document.getElementById("btn-send");
+    this.btnEnd = document.getElementById("btn-end");
 
     // Detail panel elements
     this.detailSessionId = document.getElementById("detail-session-id");
@@ -80,6 +81,7 @@ class SupervisorDashboard {
     this.btnMic?.addEventListener("click", () => this.toggleMicrophone());
     this.btnInject?.addEventListener("click", () => this.injectContext());
     this.btnSend?.addEventListener("click", () => this.sendMessage());
+    this.btnEnd?.addEventListener("click", () => this.endCall());
     this.messageInput?.addEventListener("keypress", (e) => {
       if (e.key === "Enter") this.sendMessage();
     });
@@ -217,6 +219,21 @@ class SupervisorDashboard {
           "warning",
         );
         // Play alert sound if possible
+        break;
+
+      case "session_ended":
+        this.showToast(
+          "Session Ended",
+          message.message || "The session has been terminated.",
+          "info",
+        );
+        // Clear selection if this was the selected session
+        if (message.sessionId === this.selectedSessionId) {
+          this.selectedSessionId = null;
+          this.showNoSelection();
+        }
+        // Refresh sessions list
+        this.refreshSessions();
         break;
 
       case "error":
@@ -581,6 +598,72 @@ class SupervisorDashboard {
         context: context,
       }),
     );
+
+    // Clear the context text after sending
+    this.contextText.value = "";
+  }
+
+  endCall() {
+    if (!this.selectedSessionId || !this.ws) {
+      this.showToast("No Session", "Please select a session first", "warning");
+      return;
+    }
+
+    // Show custom confirmation modal
+    this.showConfirmModal().then((confirmed) => {
+      if (confirmed) {
+        this.ws.send(
+          JSON.stringify({
+            type: "end_call",
+            sessionId: this.selectedSessionId,
+          }),
+        );
+      }
+    });
+  }
+
+  showConfirmModal() {
+    return new Promise((resolve) => {
+      const modal = document.getElementById("confirm-modal");
+      const cancelBtn = document.getElementById("modal-cancel");
+      const confirmBtn = document.getElementById("modal-confirm");
+
+      if (!modal) {
+        // Fallback to native confirm if modal doesn't exist
+        resolve(confirm("Are you sure you want to end this session?"));
+        return;
+      }
+
+      modal.style.display = "flex";
+
+      const cleanup = () => {
+        modal.style.display = "none";
+        cancelBtn.removeEventListener("click", onCancel);
+        confirmBtn.removeEventListener("click", onConfirm);
+        modal.removeEventListener("click", onOverlayClick);
+      };
+
+      const onCancel = () => {
+        cleanup();
+        resolve(false);
+      };
+
+      const onConfirm = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const onOverlayClick = (e) => {
+        if (e.target === modal) {
+          cleanup();
+          resolve(false);
+        }
+      };
+
+      cancelBtn.addEventListener("click", onCancel);
+      confirmBtn.addEventListener("click", onConfirm);
+      modal.addEventListener("click", onOverlayClick);
+    });
   }
 
   handleCustomerAudio(sessionId, audioData) {
@@ -657,6 +740,20 @@ class SupervisorDashboard {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  showNoSelection() {
+    // Hide the session panel and show the empty state
+    const sessionPanel = document.getElementById("session-panel");
+    const noSelection = document.getElementById("no-selection");
+
+    if (sessionPanel) sessionPanel.style.display = "none";
+    if (noSelection) noSelection.style.display = "flex";
+
+    // Clear transcript
+    if (this.transcript) {
+      this.transcript.innerHTML = "";
+    }
   }
 
   showToast(title, message, type = "info") {

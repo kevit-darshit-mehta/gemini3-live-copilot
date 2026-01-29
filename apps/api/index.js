@@ -504,9 +504,66 @@ function handleSupervisorConnection(ws, targetSessionId) {
               JSON.stringify({
                 type: "context_injected",
                 sessionId: data.sessionId,
+                message: "Context injected successfully",
+              }),
+            );
+            logger.info(`Context injected for session ${data.sessionId}`);
+          } else {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                message: "Cannot inject context: session not in AI mode",
               }),
             );
           }
+          break;
+
+        case "end_call":
+          // End the customer call/session
+          logger.info(`Ending session ${data.sessionId} by supervisor`);
+
+          // Notify customer that call is ending
+          if (session.customerWs?.readyState === 1) {
+            session.customerWs.send(
+              JSON.stringify({
+                type: "session_ended",
+                message: "The session has been ended by the supervisor.",
+              }),
+            );
+            // Close customer WebSocket
+            session.customerWs.close(1000, "Session ended by supervisor");
+          }
+
+          // Close Gemini session if active
+          if (session.geminiSession) {
+            await session.geminiSession.close();
+          }
+
+          // Update session status
+          conversationManager.updateSession(data.sessionId, {
+            status: "ended",
+            endedAt: Date.now(),
+            endedBy: "supervisor",
+          });
+
+          // Notify supervisor of success
+          ws.send(
+            JSON.stringify({
+              type: "session_ended",
+              sessionId: data.sessionId,
+              message: "Session ended successfully",
+            }),
+          );
+
+          // Broadcast to all supervisors
+          broadcastToSupervisors({
+            type: "session_update",
+            sessionId: data.sessionId,
+            data: {
+              ...conversationManager.getSession(data.sessionId),
+              status: "ended",
+            },
+          });
           break;
       }
     } catch (error) {
