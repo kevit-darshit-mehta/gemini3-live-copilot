@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import crypto from "crypto";
 import { GeminiLiveSession } from "./gemini-live.js";
+import { GeminiTextAPI } from "./gemini-text.js";
 import { ConversationManager } from "./conversation-manager.js";
 import { Logger } from "@gemini-copilot/shared";
 
@@ -22,6 +23,9 @@ const wss = new WebSocketServer({ server });
 
 // Conversation manager for handling active sessions
 const conversationManager = new ConversationManager();
+
+// Gemini 3 API for enhanced analysis (coaching, analytics, summarization)
+const gemini3Api = new GeminiTextAPI(process.env.GEMINI_API_KEY);
 
 // Middleware
 app.use(express.json());
@@ -58,6 +62,74 @@ app.get("/api/sessions/:id", (req, res) => {
     return res.status(404).json({ error: "Session not found" });
   }
   res.json(session);
+});
+
+// ========================================
+// Gemini 3 Enhanced Features API Endpoints
+// ========================================
+
+/**
+ * Get AI coaching suggestions for supervisor
+ */
+app.post("/api/coaching", async (req, res) => {
+  try {
+    const { sessionId, customerMessage } = req.body;
+    const session = conversationManager.getSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const coaching = await gemini3Api.getSupervisorCoaching(
+      session.transcript,
+      customerMessage,
+    );
+
+    res.json(coaching);
+  } catch (error) {
+    logger.error("Coaching API error:", error);
+    res.status(500).json({ error: "Failed to get coaching suggestions" });
+  }
+});
+
+/**
+ * Analyze conversation for insights (powered by Gemini 3)
+ */
+app.post("/api/analyze", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const session = conversationManager.getSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const analysis = await gemini3Api.analyzeConversation(session.transcript);
+    res.json(analysis);
+  } catch (error) {
+    logger.error("Analysis API error:", error);
+    res.status(500).json({ error: "Failed to analyze conversation" });
+  }
+});
+
+/**
+ * Generate call summary (powered by Gemini 3)
+ */
+app.post("/api/summary", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const session = conversationManager.getSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const summary = await gemini3Api.generateSummary(session.transcript);
+    res.json(summary);
+  } catch (error) {
+    logger.error("Summary API error:", error);
+    res.status(500).json({ error: "Failed to generate summary" });
+  }
 });
 
 // WebSocket handling
@@ -297,32 +369,72 @@ function handleCustomerConnection(ws, sessionId) {
         });
 
         // ----------------------------------------------------
-        // SENTIMENT ANALYSIS (TRANSCRIPT)
+        // GEMINI 3 POWERED SENTIMENT ANALYSIS (TRANSCRIPT)
+        // Non-blocking to avoid delaying AI voice response
         // ----------------------------------------------------
-        const analysis = sentimentAnalyzer.analyze(data.content);
-        const escalationCheck = sentimentAnalyzer.checkEscalation(
-          session.transcript,
-        );
 
-        conversationManager.updateSession(sessionId, {
-          sentimentScore: analysis.score,
-          frustrationLevel: escalationCheck.frustrationLevel,
-        });
+        // Use Gemini 3 for intelligent sentiment detection (non-blocking)
+        gemini3Api
+          .analyzeSentiment(data.content, session.transcript.slice(-5))
+          .then((sentimentResult) => {
+            conversationManager.updateSession(sessionId, {
+              sentimentScore: sentimentResult.frustrationLevel,
+              frustrationLevel: sentimentResult.frustrationLevel,
+            });
 
-        if (escalationCheck.shouldEscalate) {
-          broadcastToSupervisors({
-            type: "escalation_alert",
-            sessionId: sessionId,
-            reason: escalationCheck.reason,
-            frustrationLevel: escalationCheck.frustrationLevel,
+            // Broadcast frustration update to supervisors
+            broadcastToSupervisors({
+              type: "frustration_update",
+              sessionId: sessionId,
+              frustrationLevel: sentimentResult.frustrationLevel,
+              sentiment: sentimentResult.sentiment,
+              reason: sentimentResult.reason,
+            });
+
+            if (sentimentResult.shouldEscalate) {
+              broadcastToSupervisors({
+                type: "escalation_alert",
+                sessionId: sessionId,
+                reason: sentimentResult.reason || "High frustration detected",
+                frustrationLevel: sentimentResult.frustrationLevel,
+              });
+            }
+
+            broadcastToSupervisors({
+              type: "session_update",
+              sessionId: sessionId,
+              data: conversationManager.getSession(sessionId),
+            });
+          })
+          .catch((err) => {
+            logger.error("Sentiment analysis error:", err.message);
           });
-        }
 
-        broadcastToSupervisors({
-          type: "session_update",
-          sessionId: sessionId,
-          data: conversationManager.getSession(sessionId),
-        });
+        // Auto-trigger analytics update (non-blocking)
+        gemini3Api
+          .analyzeConversation(session.transcript)
+          .then((analytics) => {
+            broadcastToSupervisors({
+              type: "analytics_update",
+              sessionId: sessionId,
+              data: analytics,
+            });
+          })
+          .catch(() => {});
+
+        // If in human takeover mode, auto-trigger coaching suggestions
+        if (session.mode === "human") {
+          gemini3Api
+            .getSupervisorCoaching(session.transcript, data.content)
+            .then((coaching) => {
+              broadcastToSupervisors({
+                type: "coaching_update",
+                sessionId: sessionId,
+                data: coaching,
+              });
+            })
+            .catch(() => {});
+        }
 
         // Broadcast customer message to ALL supervisors
         broadcastToSupervisors({

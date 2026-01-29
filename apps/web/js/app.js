@@ -70,6 +70,19 @@ class SupervisorDashboard {
     this.frustrationBar = document.getElementById("frustration-bar");
     this.frustrationValue = document.getElementById("frustration-value");
 
+    // Gemini 3 panel elements
+    this.btnGetCoaching = document.getElementById("btn-get-coaching");
+    this.btnAnalyze = document.getElementById("btn-analyze");
+    this.coachingTip = document.getElementById("coaching-tip");
+    this.coachingTipText = document.getElementById("coaching-tip-text");
+    this.coachingSuggestions = document.getElementById("coaching-suggestions");
+    this.suggestionList = document.getElementById("suggestion-list");
+    this.analyticsIntent = document.getElementById("analytics-intent");
+    this.analyticsSentiment = document.getElementById("analytics-sentiment");
+    this.analyticsRisk = document.getElementById("analytics-risk");
+    this.analyticsIssues = document.getElementById("analytics-issues");
+    this.issuesList = document.getElementById("issues-list");
+
     // Toast container
     this.toastContainer = document.getElementById("toast-container");
   }
@@ -82,6 +95,10 @@ class SupervisorDashboard {
     this.btnInject?.addEventListener("click", () => this.injectContext());
     this.btnSend?.addEventListener("click", () => this.sendMessage());
     this.btnEnd?.addEventListener("click", () => this.endCall());
+    this.btnGetCoaching?.addEventListener("click", () => this.getCoaching());
+    this.btnAnalyze?.addEventListener("click", () =>
+      this.analyzeConversation(),
+    );
     this.messageInput?.addEventListener("keypress", (e) => {
       if (e.key === "Enter") this.sendMessage();
     });
@@ -219,6 +236,28 @@ class SupervisorDashboard {
           "warning",
         );
         // Play alert sound if possible
+        break;
+
+      case "frustration_update":
+        // Auto-update frustration meter from Gemini 3 AI
+        if (message.sessionId === this.selectedSessionId) {
+          this.updateFrustrationMeter(message.frustrationLevel);
+        }
+        break;
+
+      case "analytics_update":
+        // Auto-update analytics panel from Gemini 3
+        if (message.sessionId === this.selectedSessionId && message.data) {
+          this.updateAnalyticsPanel(message.data);
+        }
+        break;
+
+      case "coaching_update":
+        // Auto-update coaching suggestions during takeover
+        if (message.sessionId === this.selectedSessionId && message.data) {
+          this.updateCoachingPanel(message.data);
+          this.showToast("💡 New Coaching", "AI suggestion updated", "info");
+        }
         break;
 
       case "session_ended":
@@ -664,6 +703,214 @@ class SupervisorDashboard {
       confirmBtn.addEventListener("click", onConfirm);
       modal.addEventListener("click", onOverlayClick);
     });
+  }
+
+  // ========================================
+  // Gemini 3 Enhanced Features
+  // ========================================
+
+  async getCoaching() {
+    if (!this.selectedSessionId) {
+      this.showToast("No Session", "Please select a session first", "warning");
+      return;
+    }
+
+    this.btnGetCoaching.textContent = "Loading...";
+    this.btnGetCoaching.disabled = true;
+
+    try {
+      const response = await fetch("http://localhost:3000/api/coaching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: this.selectedSessionId,
+          customerMessage: this.getLastCustomerMessage(),
+        }),
+      });
+
+      const coaching = await response.json();
+
+      // Show coaching tip
+      if (this.coachingTip && coaching.coachingTip) {
+        this.coachingTip.style.display = "block";
+        this.coachingTipText.textContent = coaching.coachingTip;
+      }
+
+      // Show suggested responses
+      if (this.coachingSuggestions && coaching.suggestedResponses) {
+        this.coachingSuggestions.style.display = "block";
+        this.suggestionList.innerHTML = coaching.suggestedResponses
+          .map(
+            (s, i) => `
+            <button class="btn btn-ghost" style="text-align: left; font-size: 0.75rem; padding: 0.5rem; white-space: normal; height: auto;" 
+                    onclick="app.useSuggestion('${s.replace(/'/g, "\\'")}')">
+              ${i + 1}. ${s}
+            </button>
+          `,
+          )
+          .join("");
+      }
+
+      this.showToast(
+        "AI Coaching Ready",
+        `Tone: ${coaching.tone} | Priority: ${coaching.priority}`,
+        "success",
+      );
+    } catch (error) {
+      console.error("Coaching error:", error);
+      this.showToast("Error", "Failed to get AI coaching", "error");
+    } finally {
+      this.btnGetCoaching.textContent = "Get AI Suggestions";
+      this.btnGetCoaching.disabled = false;
+    }
+  }
+
+  useSuggestion(text) {
+    if (this.messageInput) {
+      this.messageInput.value = text;
+      this.messageInput.focus();
+    }
+  }
+
+  getLastCustomerMessage() {
+    // Get last customer message from transcript display
+    const messages = this.transcript?.querySelectorAll(".message.customer");
+    if (messages && messages.length > 0) {
+      return messages[messages.length - 1].textContent || "";
+    }
+    return "";
+  }
+
+  async analyzeConversation() {
+    if (!this.selectedSessionId) {
+      this.showToast("No Session", "Please select a session first", "warning");
+      return;
+    }
+
+    this.btnAnalyze.textContent = "Analyzing...";
+    this.btnAnalyze.disabled = true;
+
+    try {
+      const response = await fetch("http://localhost:3000/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: this.selectedSessionId }),
+      });
+
+      const analysis = await response.json();
+
+      // Update analytics display
+      if (this.analyticsIntent) {
+        this.analyticsIntent.textContent = analysis.intent || "-";
+      }
+
+      if (this.analyticsSentiment) {
+        const sentimentColors = {
+          positive: "var(--color-success)",
+          neutral: "var(--color-text-secondary)",
+          negative: "var(--color-warning)",
+          frustrated: "var(--color-danger)",
+        };
+        this.analyticsSentiment.textContent = `${analysis.sentiment} (${analysis.sentimentScore}%)`;
+        this.analyticsSentiment.style.color =
+          sentimentColors[analysis.sentiment] || "inherit";
+      }
+
+      if (this.analyticsRisk) {
+        const riskColors = {
+          low: "var(--color-success)",
+          medium: "var(--color-warning)",
+          high: "var(--color-danger)",
+        };
+        this.analyticsRisk.textContent = analysis.escalationRisk || "-";
+        this.analyticsRisk.style.color =
+          riskColors[analysis.escalationRisk] || "inherit";
+      }
+
+      if (this.analyticsIssues && analysis.keyIssues?.length > 0) {
+        this.analyticsIssues.style.display = "block";
+        this.issuesList.innerHTML = analysis.keyIssues
+          .map((issue) => `<li>${issue}</li>`)
+          .join("");
+      }
+
+      this.showToast(
+        "Analysis Complete",
+        `Intent: ${analysis.intent} | Risk: ${analysis.escalationRisk}`,
+        "info",
+      );
+    } catch (error) {
+      console.error("Analysis error:", error);
+      this.showToast("Error", "Failed to analyze conversation", "error");
+    } finally {
+      this.btnAnalyze.textContent = "Analyze Conversation";
+      this.btnAnalyze.disabled = false;
+    }
+  }
+
+  /**
+   * Update analytics panel from WebSocket auto-update
+   */
+  updateAnalyticsPanel(analysis) {
+    if (this.analyticsIntent) {
+      this.analyticsIntent.textContent = analysis.intent || "-";
+    }
+
+    if (this.analyticsSentiment) {
+      const sentimentColors = {
+        positive: "var(--color-success)",
+        neutral: "var(--color-text-secondary)",
+        negative: "var(--color-warning)",
+        frustrated: "var(--color-danger)",
+      };
+      this.analyticsSentiment.textContent = `${analysis.sentiment || "-"} (${analysis.sentimentScore || 0}%)`;
+      this.analyticsSentiment.style.color =
+        sentimentColors[analysis.sentiment] || "inherit";
+    }
+
+    if (this.analyticsRisk) {
+      const riskColors = {
+        low: "var(--color-success)",
+        medium: "var(--color-warning)",
+        high: "var(--color-danger)",
+      };
+      this.analyticsRisk.textContent = analysis.escalationRisk || "-";
+      this.analyticsRisk.style.color =
+        riskColors[analysis.escalationRisk] || "inherit";
+    }
+
+    if (this.analyticsIssues && analysis.keyIssues?.length > 0) {
+      this.analyticsIssues.style.display = "block";
+      this.issuesList.innerHTML = analysis.keyIssues
+        .map((issue) => `<li>${issue}</li>`)
+        .join("");
+    }
+  }
+
+  /**
+   * Update coaching panel from WebSocket auto-update (during takeover)
+   */
+  updateCoachingPanel(coaching) {
+    // Show coaching tip
+    if (this.coachingTip && coaching.coachingTip) {
+      this.coachingTip.style.display = "block";
+      this.coachingTipText.textContent = coaching.coachingTip;
+    }
+
+    // Show suggested responses
+    if (this.coachingSuggestions && coaching.suggestedResponses) {
+      this.coachingSuggestions.style.display = "block";
+      this.suggestionList.innerHTML = coaching.suggestedResponses
+        .map(
+          (s, i) => `
+          <button class="btn btn-ghost" style="text-align: left; font-size: 0.75rem; padding: 0.5rem; white-space: normal; height: auto;" 
+                  onclick="app.useSuggestion('${s.replace(/'/g, "\\'")}')">
+            ${i + 1}. ${s}
+          </button>
+        `,
+        )
+        .join("");
+    }
   }
 
   handleCustomerAudio(sessionId, audioData) {

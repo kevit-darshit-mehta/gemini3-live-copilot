@@ -252,7 +252,7 @@ YOUR BEHAVIOR:
               clearTimeout(this.transcriptionTimeout);
             }
 
-            // Set a debounce timeout - emit after 800ms of no new words
+            // Set a debounce timeout - emit after 400ms of no new words (faster feedback)
             this.transcriptionTimeout = setTimeout(() => {
               if (this.pendingInputTranscription) {
                 const completeText = this.pendingInputTranscription.trim();
@@ -267,7 +267,7 @@ YOUR BEHAVIOR:
                 }
                 this.pendingInputTranscription = "";
               }
-            }, 800);
+            }, 400);
           }
         }
 
