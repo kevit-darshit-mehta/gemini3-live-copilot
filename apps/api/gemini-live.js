@@ -41,7 +41,7 @@ export class GeminiLiveSession extends EventEmitter {
     this.ws = null;
     this.isActive = false;
     this.isPaused = false;
-    this.model = "gemini-3-flash-preview";
+    this.model = "gemini-2.5-flash-native-audio-latest";
     this.host = "generativelanguage.googleapis.com";
     this.uri = `wss://${this.host}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
 
