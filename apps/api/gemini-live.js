@@ -43,32 +43,25 @@ export class GeminiLiveSession extends EventEmitter {
     this.isPaused = false;
     this.model = "gemini-2.5-flash-native-audio-latest";
     this.host = "generativelanguage.googleapis.com";
-    this.uri = `wss://${this.host}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
+    // Switch to v1beta as v1alpha might not support output_audio_transcription for this model
+    this.uri = `wss://${this.host}/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
 
     this.systemInstruction = `You are Kora, a friendly and professional customer support AI assistant.
 
-CRITICAL OUTPUT RULES (MUST FOLLOW):
-- You are SPEAKING directly to a customer via voice.
-- Output ONLY the words you want the customer to HEAR.
-- NEVER include thoughts, reasoning, actions, or metadata in your output.
-- NEVER use formatting like "**Acknowledge**", "[Action]", "My next step is...", or "I will...".
-- NEVER explain what you are doing or thinking.
-- Just speak naturally as if you are on a phone call.
+CRITICAL OUTPUT RULE:
+You are in AUDIO-ONLY mode.
+To display your words to the user, you MUST use the "log_message" tool.
+For EVERY response, call "log_message" with the exact text you are speaking.
 
-LANGUAGE: Always respond in English only.
+EXAMPLE:
+User: "Hi"
+You Call Tool: log_message({ message: "Hello! How can I help?" })
+(Then you speak "Hello! How can I help?")
 
-EXAMPLE OF WRONG OUTPUT (DO NOT DO THIS):
-"**Acknowledge and Prompt** I'm noting the user's Hello. I will offer assistance."
-
-EXAMPLE OF CORRECT OUTPUT (DO THIS):
-"Hello! How can I help you today?"
-
-YOUR BEHAVIOR:
-- Be warm, helpful, and patient.
-- Ask clarifying questions when needed.
-- Keep responses concise and conversational.
-- If you don't know something, say so politely.
+Do NOT output loose text. ONLY use the tool.
 `;
+    this.aiTextBuffer = "";
+    this.lastEmittedText = "";
   }
 
   /**
@@ -80,7 +73,7 @@ YOUR BEHAVIOR:
         this.ws = new WebSocket(this.uri);
 
         this.ws.on("open", () => {
-          logger.info("Connected to Live API");
+          logger.info("Connected to Live API (v1beta)");
           this.isActive = true;
           this.setupSession();
           resolve(true);
@@ -120,7 +113,7 @@ YOUR BEHAVIOR:
       setup: {
         model: `models/${this.model}`,
         generation_config: {
-          response_modalities: ["AUDIO"],
+          response_modalities: ["AUDIO"], // Revert to stable AUDIO-only
           speech_config: {
             voice_config: {
               prebuilt_voice_config: {
@@ -132,7 +125,24 @@ YOUR BEHAVIOR:
         system_instruction: {
           parts: [{ text: this.systemInstruction }],
         },
-        // Enable transcription - empty objects as per API spec
+        tools: [
+          {
+            function_declarations: [
+              {
+                name: "log_message",
+                description: "Logs the spoken text for the transcript.",
+                parameters: {
+                  type: "OBJECT",
+                  properties: {
+                    message: { type: "STRING" },
+                  },
+                  required: ["message"],
+                },
+              },
+            ],
+          },
+        ],
+        // Enable transcription
         input_audio_transcription: {},
         output_audio_transcription: {},
       },
@@ -175,7 +185,13 @@ YOUR BEHAVIOR:
         turns: [
           {
             role: "user",
-            parts: [{ text: text }],
+            parts: [
+              {
+                text:
+                  text +
+                  "\n\n(SYSTEM: Remember to use the THOUGHT/SPEECH format. Start with SPEECH: ...)",
+              },
+            ],
           },
         ],
         turn_complete: true,
@@ -199,6 +215,8 @@ YOUR BEHAVIOR:
         response = JSON.parse(data);
       }
 
+      // ... (rest of handleMessage) ...
+
       // Handle ServerContent (Audio/Text)
       if (response.serverContent) {
         const content = response.serverContent;
@@ -208,25 +226,34 @@ YOUR BEHAVIOR:
           const parts = content.modelTurn.parts;
 
           for (const part of parts) {
-            // Handle text output
-            // NOTE: The 'thought' field is always present in Gemini Live AUDIO mode
-            // So we emit all text, which includes AI's thinking/reasoning
-            // This is the only text available since outputAudioTranscription doesn't work
-            if (part.text) {
-              logger.info(`AI Text: "${part.text.substring(0, 100)}..."`);
-              this.emit("response", { type: "text", content: part.text });
+            // 1. Handle Function Calls (The Correct Way)
+            if (part.functionCall) {
+              this.handleToolCall(part.functionCall);
+              continue;
             }
 
-            // Handle audio data
+            // 2. Handle Text (Fallback logging)
+            if (part.text) {
+              // logger.debug(`AI Raw Text: "${part.text.substring(0, 50)}..."`);
+            }
+
+            // 3. Handle Audio
             if (
               part.inlineData &&
               part.inlineData.mimeType.startsWith("audio/")
             ) {
-              logger.debug(`Audio chunk: ${part.inlineData.data.length} bytes`);
               this.emit("audio", part.inlineData.data);
             }
           }
         }
+
+        // Handle turn completion
+        if (content.turnComplete) {
+          logger.info("Turn complete");
+          this.emit("turn_complete");
+        }
+
+        // ... (outputAudioTranscription can stay as backup, though likely unused) ...
 
         // Handle audio transcription (text version of what AI speaks)
         // NOTE: This doesn't seem to work with current Gemini Live API config
@@ -240,8 +267,7 @@ YOUR BEHAVIOR:
           }
         }
 
-        // Handle input transcription (customer's speech transcribed by Gemini)
-        // Buffer partial transcriptions to form complete sentences
+        // ... (Input transcription handling remains same) ...
         if (content.inputTranscription) {
           const customerText = content.inputTranscription.text;
           // Only process English text - reject Hindi/Gujarati/etc.
@@ -267,7 +293,7 @@ YOUR BEHAVIOR:
                   logger.info(`Customer (English): "${completeText}"`);
                   this.emit("input_transcription", { text: completeText });
                 } else {
-                  logger.info(
+                  logger.debug(
                     `Rejected non-English sentence: "${completeText.substring(0, 50)}..."`,
                   );
                 }
@@ -277,26 +303,9 @@ YOUR BEHAVIOR:
           }
         }
 
+        // Handle turn completion
         if (content.turnComplete) {
           logger.info("Turn complete");
-          // Flush any pending transcription on turn complete
-          if (this.pendingInputTranscription) {
-            const completeText = this.pendingInputTranscription.trim();
-            // Final English check before emitting
-            if (isEnglishText(completeText)) {
-              logger.info(`Customer (flushed): "${completeText}"`);
-              this.emit("input_transcription", { text: completeText });
-            } else {
-              logger.info(
-                `Rejected non-English (flushed): "${completeText.substring(0, 50)}..."`,
-              );
-            }
-            this.pendingInputTranscription = "";
-            if (this.transcriptionTimeout) {
-              clearTimeout(this.transcriptionTimeout);
-              this.transcriptionTimeout = null;
-            }
-          }
           this.emit("turn_complete");
         }
       }
@@ -304,11 +313,6 @@ YOUR BEHAVIOR:
       // Handle setup complete
       if (response.setupComplete) {
         logger.info("Gemini session setup complete");
-      }
-
-      // Handle Tool Calls (Not implemented for this demo but good for future)
-      if (response.toolCall) {
-        logger.info("Tool call received:", response.toolCall);
       }
     } catch (error) {
       logger.error("Error parsing message:", error);
