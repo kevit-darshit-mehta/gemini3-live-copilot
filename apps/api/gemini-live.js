@@ -48,20 +48,11 @@ export class GeminiLiveSession extends EventEmitter {
 
     this.systemInstruction = `You are Kora, a friendly and professional customer support AI assistant.
 
-CRITICAL OUTPUT RULE:
-You are in AUDIO-ONLY mode.
-To display your words to the user, you MUST use the "log_message" tool.
-For EVERY response, call "log_message" with the exact text you are speaking.
-
-EXAMPLE:
-User: "Hi"
-You Call Tool: log_message({ message: "Hello! How can I help?" })
-(Then you speak "Hello! How can I help?")
-
-Do NOT output loose text. ONLY use the tool.
+You are speaking naturally with customers. Be helpful, concise, and professional.
 `;
-    this.aiTextBuffer = "";
-    this.lastEmittedText = "";
+
+    // Buffer for accumulating transcription chunks
+    this.transcriptionBuffer = "";
   }
 
   /**
@@ -113,7 +104,7 @@ Do NOT output loose text. ONLY use the tool.
       setup: {
         model: `models/${this.model}`,
         generation_config: {
-          response_modalities: ["AUDIO"], // Revert to stable AUDIO-only
+          response_modalities: ["AUDIO"],
           speech_config: {
             voice_config: {
               prebuilt_voice_config: {
@@ -125,24 +116,7 @@ Do NOT output loose text. ONLY use the tool.
         system_instruction: {
           parts: [{ text: this.systemInstruction }],
         },
-        tools: [
-          {
-            function_declarations: [
-              {
-                name: "log_message",
-                description: "Logs the spoken text for the transcript.",
-                parameters: {
-                  type: "OBJECT",
-                  properties: {
-                    message: { type: "STRING" },
-                  },
-                  required: ["message"],
-                },
-              },
-            ],
-          },
-        ],
-        // Enable transcription
+        // Enable transcriptions
         input_audio_transcription: {},
         output_audio_transcription: {},
       },
@@ -226,18 +200,13 @@ Do NOT output loose text. ONLY use the tool.
           const parts = content.modelTurn.parts;
 
           for (const part of parts) {
-            // 1. Handle Function Calls (The Correct Way)
-            if (part.functionCall) {
-              this.handleToolCall(part.functionCall);
-              continue;
-            }
-
-            // 2. Handle Text (Fallback logging)
+            // Handle regular text
             if (part.text) {
-              // logger.debug(`AI Raw Text: "${part.text.substring(0, 50)}..."`);
+              logger.info(`AI Text: "${part.text.substring(0, 100)}..."`);
+              this.emit("response", { type: "text", content: part.text });
             }
 
-            // 3. Handle Audio
+            // Handle Audio
             if (
               part.inlineData &&
               part.inlineData.mimeType.startsWith("audio/")
@@ -253,17 +222,29 @@ Do NOT output loose text. ONLY use the tool.
           this.emit("turn_complete");
         }
 
-        // ... (outputAudioTranscription can stay as backup, though likely unused) ...
+        // Handle output transcription (accumulate chunks into sentences)
+        if (content.outputTranscription) {
+          const chunk = content.outputTranscription.text;
+          if (chunk) {
+            this.transcriptionBuffer += chunk;
 
-        // Handle audio transcription (text version of what AI speaks)
-        // NOTE: This doesn't seem to work with current Gemini Live API config
-        if (content.outputAudioTranscription) {
-          const transcriptionText = content.outputAudioTranscription.text;
-          if (transcriptionText) {
-            logger.info(
-              `AI Transcription: "${transcriptionText.substring(0, 100)}..."`,
-            );
-            this.emit("response", { type: "text", content: transcriptionText });
+            // Check if we have a complete sentence (ends with . ! ?)
+            const sentenceMatch =
+              this.transcriptionBuffer.match(/^(.*?[.!?])\s*/);
+
+            if (sentenceMatch) {
+              const completeSentence = sentenceMatch[1].trim();
+              logger.info(`AI Response: "${completeSentence}"`);
+              this.emit("response", {
+                type: "text",
+                content: completeSentence,
+              });
+
+              // Remove the emitted sentence from buffer
+              this.transcriptionBuffer = this.transcriptionBuffer
+                .substring(sentenceMatch[0].length)
+                .trim();
+            }
           }
         }
 
