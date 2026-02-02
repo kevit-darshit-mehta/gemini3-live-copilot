@@ -216,6 +216,15 @@ class SupervisorDashboard {
         );
         break;
 
+      case "customer_input":
+        // Handle customer's spoken input transcription
+        this.addMessageToTranscript(
+          message.sessionId,
+          "customer",
+          message.text,
+        );
+        break;
+
       case "customer_audio":
         // Handle incoming customer audio PCM
         this.handleCustomerAudio(message.sessionId, message.data);

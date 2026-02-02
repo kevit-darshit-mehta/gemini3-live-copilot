@@ -48,9 +48,14 @@ export class GeminiLiveSession extends EventEmitter {
 
     this.systemInstruction = `You are Kora, a friendly and professional customer support AI assistant.
 
-You are speaking naturally with customers. Be helpful, concise, and professional.
-`;
+IMPORTANT: You are in voice conversation mode. Speak naturally and directly to the customer.
+Do NOT include any internal thoughts, meta-commentary, or markdown formatting in your speech.
+Just speak your response naturally as if talking to a person.
 
+Example:
+❌ BAD: "**Addressing the greeting** I've acknowledged..."
+✅ GOOD: "Hello! How can I help you today?"
+`;
     // Buffer for accumulating transcription chunks
     this.transcriptionBuffer = "";
   }
@@ -148,6 +153,42 @@ You are speaking naturally with customers. Be helpful, concise, and professional
   }
 
   /**
+   * Clean transcript by removing internal thoughts and formatting
+   * @param {string} text - Raw transcript text
+   * @returns {string} - Cleaned text
+   */
+  cleanTranscript(text) {
+    if (!text) return "";
+
+    let cleaned = text;
+
+    // Remove markdown bold markers (**text**)
+    cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, "$1");
+
+    // Remove thought markers and meta-commentary
+    // Patterns like "**Something** description" or "*thinking* text"
+    cleaned = cleaned.replace(/\*[^*]+\*/g, "");
+
+    // Remove common meta-phrases that indicate internal thoughts
+    const metaPhrases = [
+      /\*\*[^*]+\*\*\s*/g, // Any **bold** text
+      /^.*?(acknowledg|address|formulat|maintain|focus|believe|plan).{0,100}?\.\s*/gi,
+      /^I've .{0,50}?\.\s*/gi,
+      /^My .{0,50}?\.\s*/gi,
+      /^Now,?\s*I\s+(am|will).{0,50}?\.\s*/gi,
+    ];
+
+    metaPhrases.forEach((pattern) => {
+      cleaned = cleaned.replace(pattern, "");
+    });
+
+    // Trim and clean up multiple spaces
+    cleaned = cleaned.trim().replace(/\s+/g, " ");
+
+    return cleaned;
+  }
+
+  /**
    * Send text to Gemini (inject context or user text)
    * @param {string} text
    */
@@ -219,6 +260,23 @@ You are speaking naturally with customers. Be helpful, concise, and professional
         // Handle turn completion
         if (content.turnComplete) {
           logger.info("Turn complete");
+
+          // Flush any remaining transcription buffer
+          if (this.transcriptionBuffer && this.transcriptionBuffer.trim()) {
+            let finalText = this.cleanTranscript(
+              this.transcriptionBuffer.trim(),
+            );
+
+            if (finalText) {
+              logger.info(`AI Response (final): "${finalText}"`);
+              this.emit("response", {
+                type: "text",
+                content: finalText,
+              });
+            }
+            this.transcriptionBuffer = "";
+          }
+
           this.emit("turn_complete");
         }
 
@@ -233,12 +291,18 @@ You are speaking naturally with customers. Be helpful, concise, and professional
               this.transcriptionBuffer.match(/^(.*?[.!?])\s*/);
 
             if (sentenceMatch) {
-              const completeSentence = sentenceMatch[1].trim();
-              logger.info(`AI Response: "${completeSentence}"`);
-              this.emit("response", {
-                type: "text",
-                content: completeSentence,
-              });
+              let completeSentence = sentenceMatch[1].trim();
+
+              // Filter out internal thoughts and meta-commentary
+              completeSentence = this.cleanTranscript(completeSentence);
+
+              if (completeSentence) {
+                logger.info(`AI Response: "${completeSentence}"`);
+                this.emit("response", {
+                  type: "text",
+                  content: completeSentence,
+                });
+              }
 
               // Remove the emitted sentence from buffer
               this.transcriptionBuffer = this.transcriptionBuffer
