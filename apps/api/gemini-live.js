@@ -312,8 +312,13 @@ Example:
         // ... (Input transcription handling remains same) ...
         if (content.inputTranscription) {
           const customerText = content.inputTranscription.text;
+          logger.info(`[TRANSCRIPTION] Received: "${customerText}"`);
+
           // Only process English text - reject Hindi/Gujarati/etc.
           if (customerText && isEnglishText(customerText)) {
+            logger.info(
+              `[TRANSCRIPTION] Passed English check: "${customerText}"`,
+            );
             // Append to pending transcription buffer
             if (this.pendingInputTranscription) {
               this.pendingInputTranscription += " " + customerText;
@@ -342,6 +347,10 @@ Example:
                 this.pendingInputTranscription = "";
               }
             }, 400);
+          } else {
+            logger.warn(
+              `[TRANSCRIPTION] Failed English check: "${customerText}"`,
+            );
           }
         }
 

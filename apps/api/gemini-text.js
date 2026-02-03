@@ -59,15 +59,50 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
 
     try {
       const result = await this.model.generateContent(prompt);
-      const responseText = result.response.text();
+      let responseText = result.response.text();
 
-      // Parse JSON from response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      logger.info(
+        `Analytics raw response: ${responseText.substring(0, 500)}...`,
+      );
+
+      // Remove markdown code blocks if present
+      responseText = responseText
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      // Try to parse JSON from response
+      let parsed;
+      try {
+        // First try: parse the entire response as-is
+        parsed = JSON.parse(responseText);
+      } catch (directParseError) {
+        // Second try: extract JSON object with regex
+        let jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+          } catch (regexParseError) {
+            logger.error("JSON parse error:", regexParseError.message);
+            logger.error(
+              "Failed to parse JSON:",
+              jsonMatch[0].substring(0, 500),
+            );
+          }
+        }
       }
 
-      logger.warn("Could not parse analysis response");
+      if (parsed) {
+        logger.info(
+          `Analytics parsed: intent=${parsed.intent}, sentiment=${parsed.sentiment}`,
+        );
+        return parsed;
+      }
+
+      logger.warn(
+        "Could not parse analysis response. Full response:",
+        responseText.substring(0, 500),
+      );
       return {
         sentiment: "neutral",
         sentimentScore: 50,

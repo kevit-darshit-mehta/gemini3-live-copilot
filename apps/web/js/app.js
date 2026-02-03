@@ -251,6 +251,20 @@ class SupervisorDashboard {
         // Auto-update frustration meter from Gemini 3 AI
         if (message.sessionId === this.selectedSessionId) {
           this.updateFrustrationMeter(message.frustrationLevel);
+
+          // Also update analytics sentiment to match (keep them synchronized)
+          if (this.analyticsSentiment) {
+            const sentimentColors = {
+              positive: "var(--color-success)",
+              neutral: "var(--color-text-secondary)",
+              negative: "var(--color-warning)",
+              frustrated: "var(--color-danger)",
+              angry: "var(--color-danger)",
+            };
+            this.analyticsSentiment.textContent = `${message.sentiment || "-"} (${message.frustrationLevel || 0}%)`;
+            this.analyticsSentiment.style.color =
+              sentimentColors[message.sentiment] || "inherit";
+          }
         }
         break;
 

@@ -671,8 +671,42 @@ function handleSupervisorConnection(ws, targetSessionId) {
 
         case "inject_context":
           // Inject context into Gemini session
-          if (session.mode === "ai" && session.geminiSession) {
-            await session.geminiSession.injectContext(data.context);
+          const targetSession = conversationManager.getSession(data.sessionId);
+
+          if (!targetSession) {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                message: "Session not found",
+              }),
+            );
+            break;
+          }
+
+          if (targetSession.mode !== "ai") {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                message: `Cannot inject context: session is in ${targetSession.mode} mode. Context injection only works in AI mode.`,
+              }),
+            );
+            break;
+          }
+
+          if (!targetSession.geminiSession) {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                message:
+                  "Cannot inject context: AI session not initialized yet. Please wait a moment and try again.",
+              }),
+            );
+            break;
+          }
+
+          // All checks passed - inject context
+          try {
+            await targetSession.geminiSession.injectContext(data.context);
             ws.send(
               JSON.stringify({
                 type: "context_injected",
@@ -681,12 +715,16 @@ function handleSupervisorConnection(ws, targetSessionId) {
               }),
             );
             logger.info(`Context injected for session ${data.sessionId}`);
-          } else {
+          } catch (error) {
             ws.send(
               JSON.stringify({
                 type: "error",
-                message: "Cannot inject context: session not in AI mode",
+                message: `Failed to inject context: ${error.message}`,
               }),
+            );
+            logger.error(
+              `Context injection failed for session ${data.sessionId}:`,
+              error,
             );
           }
           break;
