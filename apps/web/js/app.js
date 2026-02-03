@@ -751,13 +751,21 @@ class SupervisorDashboard {
         this.suggestionList.innerHTML = coaching.suggestedResponses
           .map(
             (s, i) => `
-            <button class="btn btn-ghost" style="text-align: left; font-size: 0.75rem; padding: 0.5rem; white-space: normal; height: auto;" 
-                    onclick="app.useSuggestion('${s.replace(/'/g, "\\'")}')">
+            <button class="btn btn-ghost suggestion-btn" data-suggestion="${s.replace(/"/g, "&quot;")}" style="text-align: left; font-size: 0.75rem; padding: 0.5rem; white-space: normal; height: auto;">
               ${i + 1}. ${s}
             </button>
           `,
           )
           .join("");
+
+        // Add event listeners to suggestion buttons
+        this.suggestionList
+          .querySelectorAll(".suggestion-btn")
+          .forEach((btn) => {
+            btn.addEventListener("click", () => {
+              this.useSuggestion(btn.dataset.suggestion);
+            });
+          });
       }
 
       this.showToast(
@@ -912,13 +920,19 @@ class SupervisorDashboard {
       this.suggestionList.innerHTML = coaching.suggestedResponses
         .map(
           (s, i) => `
-          <button class="btn btn-ghost" style="text-align: left; font-size: 0.75rem; padding: 0.5rem; white-space: normal; height: auto;" 
-                  onclick="app.useSuggestion('${s.replace(/'/g, "\\'")}')">
+          <button class="btn btn-ghost suggestion-btn" data-suggestion="${s.replace(/"/g, "&quot;")}" style="text-align: left; font-size: 0.75rem; padding: 0.5rem; white-space: normal; height: auto;">
             ${i + 1}. ${s}
           </button>
         `,
         )
         .join("");
+
+      // Add event listeners to suggestion buttons
+      this.suggestionList.querySelectorAll(".suggestion-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          this.useSuggestion(btn.dataset.suggestion);
+        });
+      });
     }
   }
 

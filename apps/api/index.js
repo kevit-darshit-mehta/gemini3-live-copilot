@@ -256,6 +256,45 @@ function handleCustomerConnection(ws, sessionId) {
         content: data.text,
         timestamp: Date.now(),
       });
+
+      // TRIGGER SENTIMENT ANALYSIS (Gemini 3 Powered)
+      gemini3Api
+        .analyzeSentiment(data.text, session.transcript.slice(-5))
+        .then((sentimentResult) => {
+          conversationManager.updateSession(sessionId, {
+            sentimentScore: sentimentResult.frustrationLevel,
+            frustrationLevel: sentimentResult.frustrationLevel,
+          });
+
+          // Broadcast frustration update to supervisors
+          broadcastToSupervisors({
+            type: "frustration_update",
+            sessionId: sessionId,
+            frustrationLevel: sentimentResult.frustrationLevel,
+            sentiment: sentimentResult.sentiment,
+            reason: sentimentResult.reason,
+          });
+
+          if (sentimentResult.shouldEscalate) {
+            broadcastToSupervisors({
+              type: "escalation_alert",
+              sessionId: sessionId,
+              reason: sentimentResult.reason || "High frustration detected",
+              frustrationLevel: sentimentResult.frustrationLevel,
+            });
+          }
+
+          broadcastToSupervisors({
+            type: "session_update",
+            sessionId: sessionId,
+            data: conversationManager.serializeSession(
+              conversationManager.getSession(sessionId),
+            ),
+          });
+        })
+        .catch((err) => {
+          logger.error("Sentiment analysis error:", err.message);
+        });
     });
 
     geminiSession.on("error", (error) => {
@@ -283,7 +322,9 @@ function handleCustomerConnection(ws, sessionId) {
   broadcastToSupervisors({
     type: "session_update",
     sessionId: sessionId,
-    data: conversationManager.getSession(sessionId),
+    data: conversationManager.serializeSession(
+      conversationManager.getSession(sessionId),
+    ),
   });
 
   // Handle incoming messages from customer
@@ -347,7 +388,9 @@ function handleCustomerConnection(ws, sessionId) {
         broadcastToSupervisors({
           type: "session_update",
           sessionId: sessionId,
-          data: conversationManager.getSession(sessionId),
+          data: conversationManager.serializeSession(
+            conversationManager.getSession(sessionId),
+          ),
         });
         // ----------------------------------------------------
         // SENTIMENT ANALYSIS END
@@ -413,7 +456,9 @@ function handleCustomerConnection(ws, sessionId) {
             broadcastToSupervisors({
               type: "session_update",
               sessionId: sessionId,
-              data: conversationManager.getSession(sessionId),
+              data: conversationManager.serializeSession(
+                conversationManager.getSession(sessionId),
+              ),
             });
           })
           .catch((err) => {
@@ -466,7 +511,9 @@ function handleCustomerConnection(ws, sessionId) {
     broadcastToSupervisors({
       type: "session_update",
       sessionId: sessionId,
-      data: conversationManager.getSession(sessionId),
+      data: conversationManager.serializeSession(
+        conversationManager.getSession(sessionId),
+      ),
     });
   });
 
@@ -545,7 +592,9 @@ function handleSupervisorConnection(ws, targetSessionId) {
           broadcastToSupervisors({
             type: "session_update",
             sessionId: data.sessionId,
-            data: conversationManager.getSession(data.sessionId),
+            data: conversationManager.serializeSession(
+              conversationManager.getSession(data.sessionId),
+            ),
           });
           break;
 
@@ -584,7 +633,9 @@ function handleSupervisorConnection(ws, targetSessionId) {
           broadcastToSupervisors({
             type: "session_update",
             sessionId: data.sessionId,
-            data: conversationManager.getSession(data.sessionId),
+            data: conversationManager.serializeSession(
+              conversationManager.getSession(data.sessionId),
+            ),
           });
           break;
 
@@ -710,13 +761,34 @@ function handleSupervisorConnection(ws, targetSessionId) {
  */
 function broadcastToSupervisors(message) {
   const supervisors = conversationManager.getSupervisors();
-  const messageStr = JSON.stringify(message);
 
-  supervisors.forEach((ws) => {
-    if (ws.readyState === 1) {
-      ws.send(messageStr);
+  try {
+    const messageStr = JSON.stringify(message);
+
+    supervisors.forEach((ws) => {
+      if (ws.readyState === 1) {
+        ws.send(messageStr);
+      }
+    });
+  } catch (error) {
+    logger.error("Error broadcasting to supervisors:", error.message);
+    // Attempt to send a simplified message without circular refs
+    try {
+      const simplifiedMessage = {
+        type: message.type,
+        sessionId: message.sessionId,
+        error: "Data serialization error",
+      };
+      const fallbackStr = JSON.stringify(simplifiedMessage);
+      supervisors.forEach((ws) => {
+        if (ws.readyState === 1) {
+          ws.send(fallbackStr);
+        }
+      });
+    } catch (fallbackError) {
+      logger.error("Failed to send fallback message:", fallbackError.message);
     }
-  });
+  }
 }
 
 // Start server

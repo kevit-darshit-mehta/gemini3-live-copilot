@@ -200,13 +200,7 @@ Example:
         turns: [
           {
             role: "user",
-            parts: [
-              {
-                text:
-                  text +
-                  "\n\n(SYSTEM: Remember to use the THOUGHT/SPEECH format. Start with SPEECH: ...)",
-              },
-            ],
+            parts: [{ text: text }],
           },
         ],
         turn_complete: true,
@@ -241,10 +235,13 @@ Example:
           const parts = content.modelTurn.parts;
 
           for (const part of parts) {
-            // Handle regular text
+            // Handle regular text (with filtering)
             if (part.text) {
-              logger.info(`AI Text: "${part.text.substring(0, 100)}..."`);
-              this.emit("response", { type: "text", content: part.text });
+              const cleanedText = this.cleanTranscript(part.text);
+              if (cleanedText) {
+                logger.info(`AI Text: "${cleanedText.substring(0, 100)}..."`);
+                this.emit("response", { type: "text", content: cleanedText });
+              }
             }
 
             // Handle Audio
