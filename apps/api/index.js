@@ -370,7 +370,7 @@ function handleCustomerConnection(ws, sessionId) {
 
       // ===== AUTO-UPDATE AI COACHING (EVERY MESSAGE) =====
       gemini3Api
-        .getCoachingSuggestions(session.transcript)
+        .getSupervisorCoaching(session.transcript, data.text)
         .then(async (coaching) => {
           // Cache in database
           try {
