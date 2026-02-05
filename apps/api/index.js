@@ -9,6 +9,7 @@ import { GeminiLiveSession } from "./gemini-live.js";
 import { GeminiTextAPI } from "./gemini-text.js";
 import { ConversationManager } from "./conversation-manager.js";
 import { Logger } from "@gemini-copilot/shared";
+import databaseManager from "./database-manager.js";
 
 // Load environment variables
 config();
@@ -74,6 +75,51 @@ app.get("/api/sessions/:id", (req, res) => {
   };
 
   res.json(serializableSession);
+});
+
+// GET /api/summaries - Get all call summaries with pagination and filters
+app.get("/api/summaries", async (req, res) => {
+  try {
+    const options = {
+      limit: parseInt(req.query.limit) || 50,
+      offset: parseInt(req.query.offset) || 0,
+      sentiment: req.query.sentiment,
+      intent: req.query.intent,
+      resolution: req.query.resolution,
+      sortBy: req.query.sortBy || "created_at",
+      sortOrder: req.query.sortOrder || "DESC",
+    };
+
+    const summaries = await databaseManager.getAllSummaries(options);
+    const stats = await databaseManager.getStatistics();
+
+    res.json({
+      summaries,
+      stats,
+      pagination: {
+        limit: options.limit,
+        offset: options.offset,
+        hasMore: summaries.length === options.limit,
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching summaries:", error);
+    res.status(500).json({ error: "Failed to fetch summaries" });
+  }
+});
+
+// GET /api/summary/:sessionId - Get single summary by ID
+app.get("/api/summary/:sessionId", async (req, res) => {
+  try {
+    const summary = await databaseManager.getSummary(req.params.sessionId);
+    if (!summary) {
+      return res.status(404).json({ error: "Summary not found" });
+    }
+    res.json(summary);
+  } catch (error) {
+    logger.error("Error fetching summary:", error);
+    res.status(500).json({ error: "Failed to fetch summary" });
+  }
 });
 
 // ========================================
@@ -231,7 +277,7 @@ function handleCustomerConnection(ws, sessionId) {
       }
     });
 
-    // Handle customer speech transcribed by Gemini (input_audio_transcription)
+    // Handle customer speech transcribed by Gemini
     geminiSession.on("input_transcription", (data) => {
       // Forward to customer so they see their own speech
       if (session.customerWs?.readyState === 1) {
@@ -294,6 +340,58 @@ function handleCustomerConnection(ws, sessionId) {
         })
         .catch((err) => {
           logger.error("Sentiment analysis error:", err.message);
+        });
+
+      // ===== AUTO-UPDATE ANALYTICS (EVERY MESSAGE) =====
+      gemini3Api
+        .analyzeConversation(session.transcript)
+        .then(async (analytics) => {
+          // Cache in database
+          try {
+            await databaseManager.cacheAnalytics(sessionId, analytics);
+          } catch (dbErr) {
+            logger.error("Analytics cache error:", dbErr.message);
+          }
+
+          // Broadcast to supervisors
+          broadcastToSupervisors({
+            type: "analytics_update",
+            sessionId: sessionId,
+            data: analytics,
+          });
+
+          logger.info(
+            `[Auto-Analytics] ${sessionId}: ${analytics.intent}, ${analytics.sentiment}`,
+          );
+        })
+        .catch((err) => {
+          logger.error("Analytics auto-update error:", err.message);
+        });
+
+      // ===== AUTO-UPDATE AI COACHING (EVERY MESSAGE) =====
+      gemini3Api
+        .getCoachingSuggestions(session.transcript)
+        .then(async (coaching) => {
+          // Cache in database
+          try {
+            await databaseManager.cacheCoaching(sessionId, coaching);
+          } catch (dbErr) {
+            logger.error("Coaching cache error:", dbErr.message);
+          }
+
+          // Broadcast to supervisors
+          broadcastToSupervisors({
+            type: "coaching_update",
+            sessionId: sessionId,
+            data: coaching,
+          });
+
+          logger.info(
+            `[Auto-Coaching] ${sessionId}: ${coaching.tone}, ${coaching.priority}`,
+          );
+        })
+        .catch((err) => {
+          logger.error("Coaching auto-update error:", err.message);
         });
     });
 
@@ -503,10 +601,57 @@ function handleCustomerConnection(ws, sessionId) {
     }
   });
 
-  ws.on("close", () => {
+  ws.on("close", async () => {
     logger.info(`Customer disconnected from session ${sessionId}`);
     session.customerWs = null;
     conversationManager.updateSession(sessionId, { customerConnected: false });
+
+    // ===== GENERATE & SAVE CALL SUMMARY =====
+    if (session.transcript && session.transcript.length > 0) {
+      try {
+        // Generate summary using Gemini 3
+        const summary = await gemini3Api.generateSummary(session.transcript);
+
+        // Calculate frustration metrics from transcript
+        const frustrations = session.transcript
+          .filter((m) => m.frustrationLevel !== undefined)
+          .map((m) => m.frustrationLevel);
+        const frustrationAvg =
+          frustrations.length > 0
+            ? frustrations.reduce((a, b) => a + b, 0) / frustrations.length
+            : session.frustrationLevel || 0;
+        const frustrationMax =
+          frustrations.length > 0
+            ? Math.max(...frustrations)
+            : session.frustrationLevel || 0;
+
+        // Prepare session data with metrics
+        const sessionData = {
+          ...session,
+          frustrationAvg: frustrationAvg,
+          frustrationMax: frustrationMax,
+          escalationCount: session.escalationCount || 0,
+          escalationAlerts: session.escalationAlerts || [],
+          supervisorInterventions: session.supervisorInterventions || 0,
+          supervisorId: session.takenOverBy || null,
+          supervisorTakeoverDuration: session.supervisorTakeoverDuration || 0,
+        };
+
+        // Save to database
+        await databaseManager.saveCallSummary(sessionId, sessionData, summary);
+
+        logger.info(`Call summary saved: ${sessionId}`);
+
+        // Broadcast to supervisors
+        broadcastToSupervisors({
+          type: "call_ended",
+          sessionId: sessionId,
+          summary: summary,
+        });
+      } catch (error) {
+        logger.error(`Failed to save call summary for ${sessionId}:`, error);
+      }
+    }
 
     broadcastToSupervisors({
       type: "session_update",
@@ -830,8 +975,22 @@ function broadcastToSupervisors(message) {
 }
 
 // Start server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  logger.info(`Server running on http://localhost:${PORT}`);
-  logger.info(`WebSocket available at ws://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    // Initialize database
+    await databaseManager.initialize();
+    logger.info("Database ready");
+
+    // Start HTTP server
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+      logger.info(`Server running on http://localhost:${PORT}`);
+      logger.info(`WebSocket available at ws://localhost:${PORT}`);
+    });
+  } catch (error) {
+    logger.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();

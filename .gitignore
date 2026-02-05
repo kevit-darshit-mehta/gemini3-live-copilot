@@ -23,3 +23,10 @@ Thumbs.db
 
 # Hackathon / Output
 audio-recordings/
+
+# Database (SQLite runtime data - schema.sql is tracked)
+*.db
+*.db-shm
+*.db-wal
+apps/api/database/*.db
+apps/api/database/*.db-*

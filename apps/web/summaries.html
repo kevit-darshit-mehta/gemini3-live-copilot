@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Call Summaries | Live Support Co-Pilot</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    /* Additional styles for summaries page */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .filters {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-select {
+      padding: 0.5rem 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      color: var(--color-text);
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    .summary-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      transition: all 0.2s;
+    }
+
+    .summary-card:hover {
+      border-color: var(--color-primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .summary-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .summary-meta {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+    }
+
+    .summary-id {
+      font-family: monospace;
+      background: var(--bg-primary);
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+    }
+
+    .summary-badges {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-positive { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+    .badge-neutral { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+    .badge-negative { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+    .badge-frustrated { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .badge-resolved { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+    .badge-unresolved { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .badge-partially_resolved { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+    .badge-escalated { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+    .summary-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .metric {
+      text-align: center;
+    }
+
+    .metric label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 0.25rem;
+    }
+
+    .metric value {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .topic-list, .action-list {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0;
+    }
+
+    .topic-list li, .action-list li {
+      padding: 0.5rem;
+      background: var(--bg-primary);
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--color-text-secondary);
+    }
+
+    .empty-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--bg-primary);
+      border-radius: 0.5rem;
+      max-width: 800px;
+      width: 90%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--color-text-secondary);
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .transcript {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .message {
+      padding: 1rem;
+      border-radius: 0.5rem;
+      background: var(--bg-secondary);
+    }
+
+    .message-role {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--color-text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .message-content {
+      margin-bottom: 0.5rem;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container" style="max-width: 1400px; padding: 2rem;">
+    <!-- Header -->
+    <header style="margin-bottom: 2rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">📋 Call Summaries</h1>
+          <p style="color: var(--color-text-secondary);">Review past customer interactions</p>
+        </div>
+        <div>
+          <a href="/" class="btn btn-ghost">← Back to Dashboard</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Calls</div>
+        <div class="stat-value" id="stat-total">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Duration</div>
+        <div class="stat-value" id="stat-duration">0m</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Resolved</div>
+        <div class="stat-value" id="stat-resolved">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Frustration</div>
+        <div class="stat-value" id="stat-frustration">0%</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <select id="filter-sentiment" class="filter-select">
+        <option value="">All Sentiments</option>
+        <option value="positive">Positive</option>
+        <option value="neutral">Neutral</option>
+        <option value="negative">Negative</option>
+        <option value="frustrated">Frustrated</option>
+      </select>
+
+      <select id="filter-intent" class="filter-select">
+        <option value="">All Intents</option>
+        <option value="inquiry">Inquiry</option>
+        <option value="complaint">Complaint</option>
+        <option value="support">Support</option>
+        <option value="purchase">Purchase</option>
+        <option value="cancellation">Cancellation</option>
+        <option value="feedback">Feedback</option>
+      </select>
+
+      <select id="filter-resolution" class="filter-select">
+        <option value="">All Resolutions</option>
+        <option value="resolved">Resolved</option>
+        <option value="partially_resolved">Partially Resolved</option>
+        <option value="unresolved">Unresolved</option>
+        <option value="escalated">Escalated</option>
+      </select>
+
+      <button id="btn-refresh" class="btn btn-primary">🔄 Refresh</button>
+    </div>
+
+    <!-- Summaries List -->
+    <div id="summaries-container">
+      <!-- Summaries will be loaded here -->
+    </div>
+
+    <!-- Load More -->
+    <div style="text-align: center; padding: 2rem 0;">
+      <button id="btn-load-more" class="btn btn-ghost" style="display: none;">Load More</button>
+    </div>
+  </div>
+
+  <script src="/js/summaries.js"></script>
+</body>
+</html>

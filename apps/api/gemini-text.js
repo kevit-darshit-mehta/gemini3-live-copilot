@@ -263,10 +263,14 @@ Respond with ONLY this JSON structure (no markdown):
   async generateSummary(transcript) {
     if (!transcript || transcript.length === 0) {
       return {
-        summary: "No conversation recorded",
-        outcome: "unknown",
+        sentiment: "neutral",
+        intent: "unknown",
+        resolutionStatus: "unresolved",
+        keyTopics: [],
         actionItems: [],
-        duration: "N/A",
+        frustrationTrend: "stable",
+        fullText: "No conversation recorded",
+        insights: "",
       };
     }
 
@@ -274,34 +278,72 @@ Respond with ONLY this JSON structure (no markdown):
       .map((m) => `${m.role}: ${m.content}`)
       .join("\n");
 
-    const prompt = `Generate a professional call summary for this customer service conversation.
+    const prompt = `Generate a comprehensive call summary for this customer service conversation.
 
 CONVERSATION:
 ${conversationText}
 
-Respond with ONLY this JSON structure (no markdown):
+Respond with ONLY this JSON structure (no markdown, no explanation):
 {
-  "summary": "2-3 sentence summary of the call",
-  "customerIssue": "What the customer needed",
-  "resolution": "How it was resolved (or 'Pending' if not resolved)",
-  "outcome": "resolved" | "escalated" | "pending" | "transferred",
-  "actionItems": ["Any follow-up actions needed"],
-  "sentiment": "How the customer felt at the end"
+  "sentiment": "positive" | "neutral" | "negative" | "frustrated",
+  "intent": "complaint" | "inquiry" | "support" | "purchase" | "cancellation" | "feedback" | "other",
+  "resolutionStatus": "resolved" | "partially_resolved" | "unresolved" | "escalated",
+  "keyTopics": ["topic1", "topic2", "topic3"],
+  "actionItems": ["action1", "action2"],
+  "frustrationTrend": "increasing" | "stable" | "decreasing",
+  "fullText": "2-3 sentence comprehensive summary of the entire call",
+  "insights": "Key observation or recommendation for future interactions"
 }`;
 
     try {
       const result = await this.model.generateContent(prompt);
-      const responseText = result.response.text();
+      let responseText = result.response.text();
 
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      // Remove markdown code blocks if present
+      responseText = responseText
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(responseText);
+      } catch (e) {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        }
       }
 
-      return { summary: "Call completed", outcome: "unknown", actionItems: [] };
+      if (parsed) {
+        logger.info(
+          `Call summary generated: ${parsed.sentiment}, ${parsed.resolutionStatus}`,
+        );
+        return parsed;
+      }
+
+      return {
+        sentiment: "neutral",
+        intent: "unknown",
+        resolutionStatus: "unresolved",
+        keyTopics: [],
+        actionItems: [],
+        frustrationTrend: "stable",
+        fullText: "Call completed",
+        insights: "",
+      };
     } catch (error) {
       logger.error("Error generating summary:", error.message);
-      return { summary: "Call completed", outcome: "unknown", actionItems: [] };
+      return {
+        sentiment: "neutral",
+        intent: "unknown",
+        resolutionStatus: "unresolved",
+        keyTopics: [],
+        actionItems: [],
+        frustrationTrend: "stable",
+        fullText: "Call completed",
+        insights: "",
+      };
     }
   }
 }
