@@ -71,7 +71,7 @@ class SupervisorDashboard {
     this.frustrationValue = document.getElementById("frustration-value");
 
     // Gemini 3 panel elements
-    this.btnGetCoaching = document.getElementById("btn-get-coaching");
+    this.btnGetCoaching = document.getElementById("btn-get-suggestions");
     this.btnAnalyze = document.getElementById("btn-analyze");
     this.coachingTip = document.getElementById("coaching-tip");
     this.coachingTipText = document.getElementById("coaching-tip-text");

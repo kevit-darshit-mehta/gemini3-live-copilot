@@ -224,6 +224,13 @@ Example:
         response = JSON.parse(data);
       }
 
+      // DEBUG: Log what we receive from Gemini
+      if (response.serverContent) {
+        logger.info(
+          `[DEBUG] Gemini response keys: ${Object.keys(response.serverContent).join(", ")}`,
+        );
+      }
+
       // ... (rest of handleMessage) ...
 
       // Handle ServerContent (Audio/Text)

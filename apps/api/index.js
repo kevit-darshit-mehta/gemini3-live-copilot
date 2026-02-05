@@ -852,6 +852,116 @@ function handleSupervisorConnection(ws, targetSessionId) {
           // All checks passed - inject context
           try {
             await targetSession.geminiSession.injectContext(data.context);
+
+            // Store in transcript
+            targetSession.transcript.push({
+              role: "customer",
+              content: data.context[0],
+              timestamp: Date.now(),
+            });
+
+            // ===== TRIGGER AUTO-UPDATES (same as input_transcription) =====
+
+            // TRIGGER SENTIMENT ANALYSIS
+            gemini3Api
+              .analyzeSentiment(
+                data.context[0],
+                targetSession.transcript.slice(-5),
+              )
+              .then((sentimentResult) => {
+                conversationManager.updateSession(data.sessionId, {
+                  sentimentScore: sentimentResult.frustrationLevel,
+                  frustrationLevel: sentimentResult.frustrationLevel,
+                });
+
+                broadcastToSupervisors({
+                  type: "frustration_update",
+                  sessionId: data.sessionId,
+                  frustrationLevel: sentimentResult.frustrationLevel,
+                  sentiment: sentimentResult.sentiment,
+                  reason: sentimentResult.reason,
+                });
+
+                if (sentimentResult.shouldEscalate) {
+                  broadcastToSupervisors({
+                    type: "escalation_alert",
+                    sessionId: data.sessionId,
+                    reason:
+                      sentimentResult.reason || "High frustration detected",
+                    frustrationLevel: sentimentResult.frustrationLevel,
+                  });
+                }
+
+                broadcastToSupervisors({
+                  type: "session_update",
+                  sessionId: data.sessionId,
+                  data: conversationManager.serializeSession(
+                    conversationManager.getSession(data.sessionId),
+                  ),
+                });
+              })
+              .catch((err) => {
+                logger.error("Sentiment analysis error:", err.message);
+              });
+
+            // AUTO-UPDATE ANALYTICS
+            gemini3Api
+              .analyzeConversation(targetSession.transcript)
+              .then(async (analytics) => {
+                try {
+                  await databaseManager.cacheAnalytics(
+                    data.sessionId,
+                    analytics,
+                  );
+                } catch (dbErr) {
+                  logger.error("Analytics cache error:", dbErr.message);
+                }
+
+                broadcastToSupervisors({
+                  type: "analytics_update",
+                  sessionId: data.sessionId,
+                  data: analytics,
+                });
+
+                logger.info(
+                  `[Auto-Analytics] ${data.sessionId}: ${analytics.intent}, ${analytics.sentiment}`,
+                );
+              })
+              .catch((err) => {
+                logger.error("Analytics auto-update error:", err.message);
+              });
+
+            // AUTO-UPDATE AI COACHING
+            gemini3Api
+              .getCoachingSuggestions(targetSession.transcript)
+              .then(async (coaching) => {
+                try {
+                  await databaseManager.cacheCoaching(data.sessionId, coaching);
+                } catch (dbErr) {
+                  logger.error("Coaching cache error:", dbErr.message);
+                }
+
+                broadcastToSupervisors({
+                  type: "coaching_update",
+                  sessionId: data.sessionId,
+                  data: coaching,
+                });
+
+                logger.info(
+                  `[Auto-Coaching] ${data.sessionId}: ${coaching.tone}, ${coaching.priority}`,
+                );
+              })
+              .catch((err) => {
+                logger.error("Coaching auto-update error:", err.message);
+              });
+
+            // Broadcast customer message to supervisors
+            broadcastToSupervisors({
+              type: "customer_message",
+              sessionId: data.sessionId,
+              content: data.context[0],
+            });
+
             ws.send(
               JSON.stringify({
                 type: "context_injected",
