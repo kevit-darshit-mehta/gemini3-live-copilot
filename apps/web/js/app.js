@@ -618,6 +618,50 @@ class SupervisorDashboard {
         .querySelectorAll(".audio-bar")
         .forEach((bar) => bar.classList.add("active"));
 
+      // Initialize Web Speech API for supervisor speech transcription
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        this.recognition = new SpeechRecognition();
+        this.recognition.continuous = true;
+        this.recognition.interimResults = false;
+        this.recognition.lang = "en-US";
+
+        this.recognition.onresult = (event) => {
+          const transcript =
+            event.results[event.results.length - 1][0].transcript;
+          if (
+            transcript &&
+            transcript.trim() &&
+            this.ws &&
+            this.selectedSessionId
+          ) {
+            console.log("[Supervisor Speech] Transcribed:", transcript);
+            // Send transcribed text for transcript display
+            this.ws.send(
+              JSON.stringify({
+                type: "supervisor_speech",
+                sessionId: this.selectedSessionId,
+                text: transcript.trim(),
+              }),
+            );
+            // Also add to local UI immediately
+            this.addMessageToTranscript(
+              this.selectedSessionId,
+              "supervisor",
+              transcript.trim(),
+            );
+          }
+        };
+
+        this.recognition.onerror = (event) => {
+          console.warn("[Supervisor Speech] Recognition error:", event.error);
+        };
+
+        this.recognition.start();
+        console.log("[Supervisor Speech] Recognition started");
+      }
+
       await this.audioManager.startRecording((pcmData) => {
         if (
           this.ws &&
@@ -647,6 +691,13 @@ class SupervisorDashboard {
 
   stopRecording() {
     this.audioManager.stopRecording();
+
+    // Stop speech recognition
+    if (this.recognition) {
+      this.recognition.stop();
+      this.recognition = null;
+      console.log("[Supervisor Speech] Recognition stopped");
+    }
 
     // Update UI
     this.btnMic?.classList.remove("recording");

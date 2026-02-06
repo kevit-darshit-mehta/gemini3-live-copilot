@@ -1031,6 +1031,42 @@ function handleSupervisorConnection(ws, targetSessionId) {
           }
           break;
 
+        case "supervisor_speech":
+          // Supervisor's speech transcribed by browser Web Speech API
+          const spokenText = data.text;
+
+          if (spokenText && spokenText.trim()) {
+            logger.info(
+              `[Supervisor Speech] "${spokenText}" for session ${data.sessionId}`,
+            );
+
+            // Add to transcript
+            session.transcript.push({
+              role: "supervisor",
+              content: spokenText,
+              timestamp: Date.now(),
+            });
+
+            // Broadcast to all supervisors (so other supervisors see the message)
+            broadcastToSupervisors({
+              type: "supervisor_message",
+              sessionId: data.sessionId,
+              content: spokenText,
+              timestamp: Date.now(),
+            });
+
+            // Send text display to customer (optional - they already hear audio)
+            if (session.customerWs?.readyState === 1) {
+              session.customerWs.send(
+                JSON.stringify({
+                  type: "supervisor_message",
+                  content: spokenText,
+                }),
+              );
+            }
+          }
+          break;
+
         case "supervisor_message":
           // Forward supervisor text to customer
           session.transcript.push({
