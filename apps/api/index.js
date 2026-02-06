@@ -298,10 +298,40 @@ function handleCustomerConnection(ws, sessionId) {
       );
 
       const normalizedCustomerText = normalizeText(customerText);
+      const customerWords = normalizedCustomerText
+        .split(" ")
+        .filter((w) => w.length > 2);
+
       const isDuplicate = recentMessages.some((msg) => {
-        // Normalize both texts and compare
+        // Normalize both texts and compare with fuzzy matching
         const normalizedExisting = normalizeText(msg.content);
-        return normalizedExisting === normalizedCustomerText;
+        const existingWords = normalizedExisting
+          .split(" ")
+          .filter((w) => w.length > 2);
+
+        // Exact match
+        if (normalizedExisting === normalizedCustomerText) return true;
+
+        // Fuzzy match: if 60% of words overlap, consider it duplicate
+        if (customerWords.length >= 3 && existingWords.length >= 3) {
+          const commonWords = customerWords.filter((w) =>
+            existingWords.includes(w),
+          );
+          const overlapRatio =
+            commonWords.length /
+            Math.max(customerWords.length, existingWords.length);
+          if (overlapRatio >= 0.6) return true;
+        }
+
+        // Substring match for shorter phrases
+        if (
+          normalizedExisting.includes(normalizedCustomerText) ||
+          normalizedCustomerText.includes(normalizedExisting)
+        ) {
+          return true;
+        }
+
+        return false;
       });
 
       if (isDuplicate) {
@@ -309,6 +339,44 @@ function handleCustomerConnection(ws, sessionId) {
           `[Gemini] Skipped duplicate input transcription: "${customerText}"`,
         );
         return; // Skip processing duplicate
+      }
+
+      // Echo detection: Check if this matches any recent AI response
+      const recentAIMessages = session.transcript.filter(
+        (msg) => msg.role === "ai" && Date.now() - msg.timestamp < 10000,
+      );
+
+      const isAIEcho = recentAIMessages.some((msg) => {
+        const normalizedAI = normalizeText(msg.content);
+        const aiWords = normalizedAI.split(" ").filter((w) => w.length > 2);
+
+        // Exact match
+        if (normalizedAI === normalizedCustomerText) return true;
+
+        // Fuzzy match: if 60% of words overlap
+        if (customerWords.length >= 3 && aiWords.length >= 3) {
+          const commonWords = customerWords.filter((w) => aiWords.includes(w));
+          const overlapRatio =
+            commonWords.length / Math.max(customerWords.length, aiWords.length);
+          if (overlapRatio >= 0.6) return true;
+        }
+
+        // Substring match
+        if (
+          normalizedAI.includes(normalizedCustomerText) ||
+          normalizedCustomerText.includes(normalizedAI)
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      if (isAIEcho) {
+        logger.info(
+          `[ECHO DETECTED] Skipping AI echo from customer: "${customerText.substring(0, 50)}..."`,
+        );
+        return; // Skip - this is the AI's own voice being picked up
       }
 
       // Forward to customer so they see their own speech
@@ -505,13 +573,78 @@ function handleCustomerConnection(ws, sessionId) {
           );
 
           const normalizedCustomerText = normalizeText(customerText);
+          const customerWords = normalizedCustomerText
+            .split(" ")
+            .filter((w) => w.length > 2);
+
           const isDuplicate = recentMessages.some((msg) => {
-            // Normalize both texts and compare
+            // Normalize both texts and compare with fuzzy matching
             const normalizedExisting = normalizeText(msg.content);
-            return normalizedExisting === normalizedCustomerText;
+            const existingWords = normalizedExisting
+              .split(" ")
+              .filter((w) => w.length > 2);
+
+            // Exact match
+            if (normalizedExisting === normalizedCustomerText) return true;
+
+            // Fuzzy match: if 60% of words overlap, consider it duplicate
+            if (customerWords.length >= 3 && existingWords.length >= 3) {
+              const commonWords = customerWords.filter((w) =>
+                existingWords.includes(w),
+              );
+              const overlapRatio =
+                commonWords.length /
+                Math.max(customerWords.length, existingWords.length);
+              if (overlapRatio >= 0.6) return true;
+            }
+
+            // Substring match for shorter phrases
+            if (
+              normalizedExisting.includes(normalizedCustomerText) ||
+              normalizedCustomerText.includes(normalizedExisting)
+            ) {
+              return true;
+            }
+
+            return false;
           });
 
-          if (!isDuplicate) {
+          // Echo detection: Check if this matches any recent AI response
+          const recentAIMessages = session.transcript.filter(
+            (msg) => msg.role === "ai" && Date.now() - msg.timestamp < 10000,
+          );
+
+          const isAIEcho = recentAIMessages.some((msg) => {
+            const normalizedAI = normalizeText(msg.content);
+            const aiWords = normalizedAI.split(" ").filter((w) => w.length > 2);
+
+            if (normalizedAI === normalizedCustomerText) return true;
+
+            if (customerWords.length >= 3 && aiWords.length >= 3) {
+              const commonWords = customerWords.filter((w) =>
+                aiWords.includes(w),
+              );
+              const overlapRatio =
+                commonWords.length /
+                Math.max(customerWords.length, aiWords.length);
+              if (overlapRatio >= 0.6) return true;
+            }
+
+            if (
+              normalizedAI.includes(normalizedCustomerText) ||
+              normalizedCustomerText.includes(normalizedAI)
+            ) {
+              return true;
+            }
+
+            return false;
+          });
+
+          if (isAIEcho) {
+            logger.info(
+              `[ECHO DETECTED] Skipping AI echo from WebSpeech: "${customerText.substring(0, 50)}..."`,
+            );
+          } else if (!isDuplicate) {
             // Add to transcript
             session.transcript.push({
               role: "customer",

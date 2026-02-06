@@ -110,6 +110,9 @@ Note: Always respond in English. If you detect non-English input, respond natura
     this.pendingInputTranscription = "";
     this.transcriptionTimeout = null;
 
+    // Echo detection: Track recent AI responses to filter out speaker echo
+    this.recentAIResponses = [];
+
     const setupMessage = {
       setup: {
         model: `models/${this.model}`,
@@ -315,6 +318,21 @@ Note: Always respond in English. If you detect non-English input, respond natura
 
               if (completeSentence) {
                 logger.info(`AI Response: "${completeSentence}"`);
+
+                // Store AI response for echo detection (keep for 10 seconds)
+                this.recentAIResponses.push({
+                  text: completeSentence
+                    .toLowerCase()
+                    .replace(/[.,!?;:'"()-]/g, "")
+                    .trim(),
+                  timestamp: Date.now(),
+                });
+                // Clean old entries (older than 10 seconds)
+                const now = Date.now();
+                this.recentAIResponses = this.recentAIResponses.filter(
+                  (r) => now - r.timestamp < 10000,
+                );
+
                 this.emit("response", {
                   type: "text",
                   content: completeSentence,
@@ -369,8 +387,27 @@ Note: Always respond in English. If you detect non-English input, respond natura
                 const completeText = this.pendingInputTranscription.trim();
                 // Final English check before emitting
                 if (isEnglishText(completeText)) {
-                  logger.info(`Customer (English): "${completeText}"`);
-                  this.emit("input_transcription", { text: completeText });
+                  // Echo detection: Check if this matches any recent AI response
+                  const normalizedInput = completeText
+                    .toLowerCase()
+                    .replace(/[.,!?;:'"()-]/g, "")
+                    .trim();
+                  const isEcho = this.recentAIResponses.some((aiResp) => {
+                    // Check if customer input contains AI response or vice versa (partial match)
+                    return (
+                      normalizedInput.includes(aiResp.text) ||
+                      aiResp.text.includes(normalizedInput)
+                    );
+                  });
+
+                  if (isEcho) {
+                    logger.info(
+                      `[ECHO DETECTED] Skipping AI echo from customer input: "${completeText.substring(0, 50)}..."`,
+                    );
+                  } else {
+                    logger.info(`Customer (English): "${completeText}"`);
+                    this.emit("input_transcription", { text: completeText });
+                  }
                 } else {
                   logger.debug(
                     `Rejected non-English sentence: "${completeText.substring(0, 50)}..."`,
