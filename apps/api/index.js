@@ -279,12 +279,36 @@ function handleCustomerConnection(ws, sessionId) {
 
     // Handle customer speech transcribed by Gemini
     geminiSession.on("input_transcription", (data) => {
+      const customerText = data.text;
+
+      // Deduplication: Check if this message was recently added (within last 3 seconds)
+      // to prevent duplicates from both Web Speech API and Gemini inputTranscription
+      const now = Date.now();
+      const recentMessages = session.transcript.filter(
+        (msg) => msg.role === "customer" && now - msg.timestamp < 3000,
+      );
+
+      const isDuplicate = recentMessages.some((msg) => {
+        // Check if messages are very similar (simple string match for now)
+        const similarity =
+          msg.content.toLowerCase().trim() ===
+          customerText.toLowerCase().trim();
+        return similarity;
+      });
+
+      if (isDuplicate) {
+        logger.debug(
+          `[Gemini] Skipped duplicate input transcription: "${customerText}"`,
+        );
+        return; // Skip processing duplicate
+      }
+
       // Forward to customer so they see their own speech
       if (session.customerWs?.readyState === 1) {
         session.customerWs.send(
           JSON.stringify({
             type: "customer_transcription",
-            content: data.text,
+            content: customerText,
           }),
         );
       }
@@ -293,13 +317,13 @@ function handleCustomerConnection(ws, sessionId) {
       broadcastToSupervisors({
         type: "customer_message",
         sessionId: sessionId,
-        content: data.text,
+        content: customerText,
       });
 
       // Store in transcript
       session.transcript.push({
         role: "customer",
-        content: data.text,
+        content: customerText,
         timestamp: Date.now(),
       });
 
@@ -446,6 +470,51 @@ function handleCustomerConnection(ws, sessionId) {
         } else {
           // Forward to Gemini
           await session.geminiSession?.sendAudio(data.data);
+        }
+      } else if (data.type === "customer_speech") {
+        // Handle customer speech from Web Speech API (browser-side transcription workaround)
+        // Gemini Live API doesn't reliably send inputTranscription, so customer.html uses
+        // browser's Web Speech API to transcribe and sends it here
+        const customerText = data.text;
+
+        if (customerText && customerText.trim()) {
+          logger.info(`[WebSpeech] Customer said: "${customerText}"`);
+
+          // Deduplication: Check if this message was recently added (within last 3 seconds)
+          // to prevent duplicates from both Web Speech API and Gemini inputTranscription
+          const now = Date.now();
+          const recentMessages = session.transcript.filter(
+            (msg) => msg.role === "customer" && now - msg.timestamp < 3000,
+          );
+
+          const isDuplicate = recentMessages.some((msg) => {
+            // Check if messages are very similar (simple string match for now)
+            const similarity =
+              msg.content.toLowerCase().trim() ===
+              customerText.toLowerCase().trim();
+            return similarity;
+          });
+
+          if (!isDuplicate) {
+            // Add to transcript
+            session.transcript.push({
+              role: "customer",
+              content: customerText,
+              timestamp: Date.now(),
+            });
+
+            // Broadcast to supervisors
+            broadcastToSupervisors({
+              type: "customer_message",
+              sessionId: sessionId,
+              content: customerText,
+              timestamp: Date.now(),
+            });
+          } else {
+            logger.debug(
+              `[WebSpeech] Skipped duplicate message: "${customerText}"`,
+            );
+          }
         }
       } else if (data.type === "text") {
         // Handle text message

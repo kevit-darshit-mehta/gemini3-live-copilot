@@ -48,6 +48,9 @@ export class GeminiLiveSession extends EventEmitter {
 
     this.systemInstruction = `You are Kora, a friendly and professional customer support AI assistant.
 
+CRITICAL LANGUAGE REQUIREMENT: You MUST speak ONLY in English. Never respond in Hindi, Gujarati, or any other language.
+If the customer speaks in another language, politely ask them to continue in English.
+
 IMPORTANT: You are in voice conversation mode. Speak naturally and directly to the customer.
 Do NOT include any internal thoughts, meta-commentary, or markdown formatting in your speech.
 Just speak your response naturally as if talking to a person.
@@ -225,10 +228,18 @@ Example:
       }
 
       // DEBUG: Log what we receive from Gemini
+      logger.info(
+        `[DEBUG] Response top-level keys: ${Object.keys(response).join(", ")}`,
+      );
       if (response.serverContent) {
-        logger.info(
-          `[DEBUG] Gemini response keys: ${Object.keys(response.serverContent).join(", ")}`,
-        );
+        const contentKeys = Object.keys(response.serverContent);
+        logger.info(`[DEBUG] Gemini response keys: ${contentKeys.join(", ")}`);
+        // If we see inputTranscription, dump it fully
+        if (response.serverContent.inputTranscription) {
+          logger.info(
+            `[DEBUG] *** INPUT TRANSCRIPTION FOUND: ${JSON.stringify(response.serverContent.inputTranscription)}`,
+          );
+        }
       }
 
       // ... (rest of handleMessage) ...
@@ -317,6 +328,18 @@ Example:
         }
 
         // ... (Input transcription handling remains same) ...
+        // DEBUG: Check all keys in content for inputTranscription
+        if (
+          Object.keys(content).some(
+            (k) =>
+              k.toLowerCase().includes("input") ||
+              k.toLowerCase().includes("transcript"),
+          )
+        ) {
+          logger.info(
+            `[DEBUG] Found input-related key in content: ${Object.keys(content).join(", ")}`,
+          );
+        }
         if (content.inputTranscription) {
           const customerText = content.inputTranscription.text;
           logger.info(`[TRANSCRIPTION] Received: "${customerText}"`);

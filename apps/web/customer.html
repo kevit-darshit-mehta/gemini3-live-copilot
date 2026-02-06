@@ -96,7 +96,65 @@
         this.timerText = document.querySelector('.call-status');
         this.visualizer = document.getElementById('visualizer');
         
+        // Web Speech API for client-side transcription (workaround for Gemini not sending inputTranscription)
+        this.speechRecognition = null;
+        this.initSpeechRecognition();
+        
         this.init();
+      }
+      
+      initSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          console.warn('Web Speech API not supported in this browser');
+          return;
+        }
+        
+        this.speechRecognition = new SpeechRecognition();
+        this.speechRecognition.continuous = true;
+        this.speechRecognition.interimResults = false;
+        this.speechRecognition.lang = 'en-US';
+        
+        this.speechRecognition.onresult = (event) => {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              const transcript = event.results[i][0].transcript.trim();
+              if (transcript && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                // Send customer speech text to server for supervisor display
+                this.ws.send(JSON.stringify({
+                  type: 'customer_speech',
+                  text: transcript
+                }));
+                console.log('Customer speech sent:', transcript);
+              }
+            }
+          }
+        };
+        
+        this.speechRecognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          // Restart on recoverable errors
+          if (event.error === 'no-speech' || event.error === 'aborted') {
+            this.restartSpeechRecognition();
+          }
+        };
+        
+        this.speechRecognition.onend = () => {
+          // Auto-restart if call is still active
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.restartSpeechRecognition();
+          }
+        };
+      }
+      
+      restartSpeechRecognition() {
+        if (this.speechRecognition && this.ws && this.ws.readyState === WebSocket.OPEN) {
+          try {
+            this.speechRecognition.start();
+          } catch (e) {
+            // Already started, ignore
+          }
+        }
       }
       
       init() {
@@ -139,6 +197,16 @@
             this.showScreen('call');
             this.startTimer();
             this.startAudioStreaming();
+            
+            // Start speech recognition for supervisor transcript display
+            if (this.speechRecognition) {
+              try {
+                this.speechRecognition.start();
+                console.log('Speech recognition started');
+              } catch (e) {
+                console.warn('Speech recognition start error:', e);
+              }
+            }
             
             // Trigger visualizer
             this.visualizer.classList.add('active');
@@ -213,6 +281,15 @@
       endCall() {
         this.stopTimer();
         this.visualizer.classList.remove('active');
+        
+        // Stop speech recognition
+        if (this.speechRecognition) {
+          try {
+            this.speechRecognition.stop();
+          } catch (e) {
+            // Ignore stop errors
+          }
+        }
         
         if (this.ws) {
           this.ws.close();
