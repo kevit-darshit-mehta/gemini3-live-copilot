@@ -348,7 +348,12 @@ class SupervisorDashboard {
     const cards = this.sessionsList.querySelectorAll(".session-card");
     cards.forEach((card) => card.remove());
 
-    if (this.sessions.size === 0) {
+    // Filter out completed sessions (calls that have ended)
+    const activeSessions = Array.from(this.sessions.values()).filter(
+      (session) => session.status !== "completed",
+    );
+
+    if (activeSessions.length === 0) {
       this.noSessions.style.display = "flex";
       return;
     }
@@ -356,7 +361,7 @@ class SupervisorDashboard {
     this.noSessions.style.display = "none";
 
     // Sort sessions: human mode first, then by creation time
-    const sortedSessions = Array.from(this.sessions.values()).sort((a, b) => {
+    const sortedSessions = activeSessions.sort((a, b) => {
       if (a.mode === "human" && b.mode !== "human") return -1;
       if (a.mode !== "human" && b.mode === "human") return 1;
       return b.createdAt - a.createdAt;
@@ -980,6 +985,9 @@ class SupervisorDashboard {
       human = 0;
 
     this.sessions.forEach((session) => {
+      // Skip completed sessions from stats
+      if (session.status === "completed") return;
+
       if (session.mode === "human") human++;
       else if (session.status === "active") active++;
       else waiting++;

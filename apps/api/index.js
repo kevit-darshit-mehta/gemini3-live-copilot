@@ -722,6 +722,17 @@ function handleCustomerConnection(ws, sessionId) {
       }
     }
 
+    // ===== CLOSE SESSION =====
+    // Mark session as completed and close Gemini session
+    conversationManager.updateSession(sessionId, { status: "completed" });
+
+    // Close Gemini session if active
+    if (session.geminiSession) {
+      session.geminiSession.close();
+      session.geminiSession = null;
+    }
+
+    // Broadcast final session update with completed status
     broadcastToSupervisors({
       type: "session_update",
       sessionId: sessionId,
@@ -729,6 +740,12 @@ function handleCustomerConnection(ws, sessionId) {
         conversationManager.getSession(sessionId),
       ),
     });
+
+    // Optional: Delete session after 5 minutes to clean up memory
+    // (commented out so supervisors can still see recent calls)
+    // setTimeout(() => {
+    //   conversationManager.deleteSession(sessionId);
+    // }, 5 * 60 * 1000);
   });
 
   // Send session info to customer
@@ -1002,7 +1019,7 @@ function handleSupervisorConnection(ws, targetSessionId) {
 
             // AUTO-UPDATE AI COACHING
             gemini3Api
-              .getCoachingSuggestions(targetSession.transcript)
+              .getSupervisorCoaching(targetSession.transcript)
               .then(async (coaching) => {
                 try {
                   await databaseManager.cacheCoaching(data.sessionId, coaching);
