@@ -299,6 +299,11 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
       const result = await this.model.generateContent(prompt);
       let responseText = result.response.text();
 
+      // Log the raw response for debugging
+      logger.info(
+        `[Summary] Raw Gemini response (first 300 chars): ${responseText.substring(0, 300)}`,
+      );
+
       // Remove markdown code blocks if present
       responseText = responseText
         .replace(/```json\s*/g, "")
@@ -308,20 +313,49 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
       let parsed;
       try {
         parsed = JSON.parse(responseText);
+        logger.info(
+          `[Summary] Successfully parsed JSON. Intent: "${parsed.intent}", Sentiment: "${parsed.sentiment}"`,
+        );
       } catch (e) {
+        logger.warn(
+          `[Summary] Direct JSON parse failed, trying regex extraction: ${e.message}`,
+        );
         const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+            logger.info(
+              `[Summary] Regex parse succeeded. Intent: "${parsed.intent}", Sentiment: "${parsed.sentiment}"`,
+            );
+          } catch (regexError) {
+            logger.error(
+              `[Summary] Regex JSON parse also failed: ${regexError.message}`,
+            );
+          }
+        } else {
+          logger.error(`[Summary] No JSON object found in response`);
         }
       }
 
-      if (parsed) {
+      if (parsed && parsed.intent) {
         logger.info(
-          `Call summary generated: ${parsed.sentiment}, ${parsed.resolutionStatus}`,
+          `[Summary] ✅ Call summary generated: intent="${parsed.intent}", sentiment="${parsed.sentiment}", resolution="${parsed.resolutionStatus}"`,
         );
-        return parsed;
+        return {
+          sentiment: parsed.sentiment || "neutral",
+          intent: parsed.intent || "unknown",
+          resolutionStatus: parsed.resolutionStatus || "unresolved",
+          keyTopics: parsed.keyTopics || [],
+          actionItems: parsed.actionItems || [],
+          frustrationTrend: parsed.frustrationTrend || "stable",
+          fullText: parsed.fullText || "Call completed",
+          insights: parsed.insights || "",
+        };
       }
 
+      logger.warn(
+        "[Summary] ⚠️ Parsed object missing intent field or invalid structure",
+      );
       return {
         sentiment: "neutral",
         intent: "unknown",
@@ -329,11 +363,17 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
         keyTopics: [],
         actionItems: [],
         frustrationTrend: "stable",
-        fullText: "Call completed",
+        fullText: responseText.substring(0, 200) || "Call completed",
         insights: "",
       };
     } catch (error) {
-      logger.error("Error generating summary:", error.message);
+      logger.error(`[Summary] ❌ Error generating summary: ${error.message}`);
+      // Check if it's a rate limit error
+      if (error.message && error.message.includes("quota")) {
+        logger.error(
+          "[Summary] Rate limit exceeded - falling back to basic summary",
+        );
+      }
       return {
         sentiment: "neutral",
         intent: "unknown",
@@ -341,7 +381,7 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
         keyTopics: [],
         actionItems: [],
         frustrationTrend: "stable",
-        fullText: "Call completed",
+        fullText: "Call completed - summary unavailable due to API error",
         insights: "",
       };
     }

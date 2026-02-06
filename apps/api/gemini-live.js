@@ -71,7 +71,7 @@ Note: Always respond in English. If you detect non-English input, respond natura
         this.ws = new WebSocket(this.uri);
 
         this.ws.on("open", () => {
-          logger.info("Connected to Live API (v1beta)");
+          logger.info("[Gemini Live] ✅ Connected to Live API (v1beta)");
           this.isActive = true;
           this.setupSession();
           resolve(true);
@@ -82,7 +82,10 @@ Note: Always respond in English. If you detect non-English input, respond natura
         });
 
         this.ws.on("error", (error) => {
-          logger.error("WebSocket error:", error);
+          logger.error(
+            `[Gemini Live] WebSocket error: ${error.message || error}`,
+          );
+          logger.error(`[Gemini Live] Error details:`, error);
           this.emit("error", error);
           reject(error);
         });
