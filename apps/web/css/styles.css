@@ -142,7 +142,9 @@ body {
   background-color: var(--color-background);
   display: flex;
   flex-direction: column;
+  height: calc(100vh - 73px); /* Subtract header height (73px) */
   overflow: hidden;
+  position: relative;
 }
 
 .detail-panel {
@@ -360,13 +362,42 @@ body {
   gap: var(--space-2);
 }
 
+/* Conversation View Container - ensures proper flex layout */
+#conversation-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 .transcript-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar styling for transcript */
+.transcript-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transcript-container::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+.transcript-container::-webkit-scrollbar-thumb {
+  background: var(--color-border-hover);
+  border-radius: var(--radius-full);
+}
+
+.transcript-container::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
 }
 
 .message {

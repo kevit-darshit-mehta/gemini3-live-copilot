@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Call Summaries | Live Support Co-Pilot</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/summaries.css">
   <style>
     /* Additional styles for summaries page */
     .stats-grid {
@@ -235,79 +236,104 @@
   </style>
 </head>
 <body>
-  <div class="container" style="max-width: 1400px; padding: 2rem;">
+  <div class="dashboard-container">
     <!-- Header -->
-    <header style="margin-bottom: 2rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">📋 Call Summaries</h1>
-          <p style="color: var(--color-text-secondary);">Review past customer interactions</p>
-        </div>
-        <div>
-          <a href="/" class="btn btn-ghost">← Back to Dashboard</a>
-        </div>
+    <header style="display: flex; justify-content: space-between; align-items: inherit;">
+      <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #fff, #94a3b8); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          MISSION CONTROL
+        </h1>
+        <p style="color: #64748b; font-size: 0.875rem; letter-spacing: 0.05em;">LIVE SUPPORT OPERATIONS</p>
+      </div>
+      <div>
+        <a href="/" class="btn btn-ghost" style="border-radius: 2rem; border-color: rgba(255,255,255,0.1); color: #fff;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Live Feed
+        </a>
       </div>
     </header>
 
-    <!-- Statistics Cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Calls</div>
-        <div class="stat-value" id="stat-total">0</div>
+    <!-- Section 1: Analytics Tiles -->
+    <section class="analytics-header">
+      <!-- Total Volume -->
+      <div class="stat-panel" style="--panel-color: var(--accent-primary)">
+        <div class="stat-label">Total Volume</div>
+        <div class="stat-value-huge" id="stat-total">0</div>
+        <div class="stat-trend trend-up">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/></svg>
+          <span>12% this week</span>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Avg Duration</div>
-        <div class="stat-value" id="stat-duration">0m</div>
+
+      <!-- Resolution Rate -->
+      <div class="stat-panel" style="--panel-color: var(--accent-success)">
+        <div class="stat-label">Resolution Rate</div>
+        <div class="stat-value-huge" id="stat-resolved">0%</div>
+        <div class="stat-trend trend-up">
+          <span>Target: 85%</span>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Resolved</div>
-        <div class="stat-value" id="stat-resolved">0%</div>
+
+      <!-- Frustration Index -->
+      <div class="stat-panel" style="--panel-color: var(--accent-danger)">
+        <div class="stat-label">Frustration Index</div>
+        <div class="stat-value-huge" id="stat-frustration">0%</div>
+        <div class="stat-trend trend-down">
+          <span>Avg per call</span>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Avg Frustration</div>
-        <div class="stat-value" id="stat-frustration">0%</div>
+
+      <!-- Avg Duration -->
+      <div class="stat-panel" style="--panel-color: var(--accent-warning)">
+        <div class="stat-label">Avg Handle Time</div>
+        <div class="stat-value-huge" id="stat-duration">0m</div>
+        <div class="stat-trend">
+          <span style="color: #64748b">Optimal range: 3-5m</span>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Filters -->
-    <div class="filters">
-      <select id="filter-sentiment" class="filter-select">
-        <option value="">All Sentiments</option>
-        <option value="positive">Positive</option>
-        <option value="neutral">Neutral</option>
-        <option value="negative">Negative</option>
-        <option value="frustrated">Frustrated</option>
-      </select>
+    <!-- Section 2: Smart Filter Bar -->
+    <section class="filter-bar">
+      <div class="filter-chips" id="filter-chips">
+        <div class="chip active" data-filter="all">All Calls</div>
+        <div class="chip" data-filter="frustrated">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-danger)"></span>
+          High Frustration
+        </div>
+        <div class="chip" data-filter="unresolved">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-warning)"></span>
+          Unresolved
+        </div>
+        <div class="chip" data-filter="escalated">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-purple)"></span>
+          Escalations
+        </div>
+        <div class="chip" data-filter="positive">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-success)"></span>
+          Positive Outcome
+        </div>
+      </div>
 
-      <select id="filter-intent" class="filter-select">
-        <option value="">All Intents</option>
-        <option value="inquiry">Inquiry</option>
-        <option value="complaint">Complaint</option>
-        <option value="support">Support</option>
-        <option value="purchase">Purchase</option>
-        <option value="cancellation">Cancellation</option>
-        <option value="feedback">Feedback</option>
-      </select>
+      <div class="search-wrapper">
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Search transcripts, intents, or IDs...">
+      </div>
+    </section>
 
-      <select id="filter-resolution" class="filter-select">
-        <option value="">All Resolutions</option>
-        <option value="resolved">Resolved</option>
-        <option value="partially_resolved">Partially Resolved</option>
-        <option value="unresolved">Unresolved</option>
-        <option value="escalated">Escalated</option>
-      </select>
-
-      <button id="btn-refresh" class="btn btn-primary">🔄 Refresh</button>
-    </div>
-
-    <!-- Summaries List -->
-    <div id="summaries-container">
-      <!-- Summaries will be loaded here -->
-    </div>
+    <!-- Section 3: Premium Grid -->
+    <main class="summaries-grid" id="summaries-container">
+      <!-- Summary Cards Injected Here -->
+    </main>
 
     <!-- Load More -->
-    <div style="text-align: center; padding: 2rem 0;">
-      <button id="btn-load-more" class="btn btn-ghost" style="display: none;">Load More</button>
+    <div style="text-align: center; padding: 2rem;">
+      <button id="btn-load-more" class="btn btn-ghost" style="color: #64748b; border-color: rgba(255,255,255,0.1);">Load More Archives</button>
     </div>
   </div>
 
