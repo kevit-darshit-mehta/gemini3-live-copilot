@@ -281,6 +281,15 @@ function handleCustomerConnection(ws, sessionId) {
     geminiSession.on("input_transcription", (data) => {
       const customerText = data.text;
 
+      // Helper function to normalize text for duplicate detection
+      const normalizeText = (text) => {
+        return text
+          .toLowerCase()
+          .replace(/[.,!?;:'"()-]/g, "") // Remove common punctuation
+          .replace(/\s+/g, " ") // Normalize whitespace
+          .trim();
+      };
+
       // Deduplication: Check if this message was recently added (within last 3 seconds)
       // to prevent duplicates from both Web Speech API and Gemini inputTranscription
       const now = Date.now();
@@ -288,12 +297,11 @@ function handleCustomerConnection(ws, sessionId) {
         (msg) => msg.role === "customer" && now - msg.timestamp < 3000,
       );
 
+      const normalizedCustomerText = normalizeText(customerText);
       const isDuplicate = recentMessages.some((msg) => {
-        // Check if messages are very similar (simple string match for now)
-        const similarity =
-          msg.content.toLowerCase().trim() ===
-          customerText.toLowerCase().trim();
-        return similarity;
+        // Normalize both texts and compare
+        const normalizedExisting = normalizeText(msg.content);
+        return normalizedExisting === normalizedCustomerText;
       });
 
       if (isDuplicate) {
@@ -480,6 +488,15 @@ function handleCustomerConnection(ws, sessionId) {
         if (customerText && customerText.trim()) {
           logger.info(`[WebSpeech] Customer said: "${customerText}"`);
 
+          // Helper function to normalize text for duplicate detection
+          const normalizeText = (text) => {
+            return text
+              .toLowerCase()
+              .replace(/[.,!?;:'"()-]/g, "") // Remove common punctuation
+              .replace(/\s+/g, " ") // Normalize whitespace
+              .trim();
+          };
+
           // Deduplication: Check if this message was recently added (within last 3 seconds)
           // to prevent duplicates from both Web Speech API and Gemini inputTranscription
           const now = Date.now();
@@ -487,12 +504,11 @@ function handleCustomerConnection(ws, sessionId) {
             (msg) => msg.role === "customer" && now - msg.timestamp < 3000,
           );
 
+          const normalizedCustomerText = normalizeText(customerText);
           const isDuplicate = recentMessages.some((msg) => {
-            // Check if messages are very similar (simple string match for now)
-            const similarity =
-              msg.content.toLowerCase().trim() ===
-              customerText.toLowerCase().trim();
-            return similarity;
+            // Normalize both texts and compare
+            const normalizedExisting = normalizeText(msg.content);
+            return normalizedExisting === normalizedCustomerText;
           });
 
           if (!isDuplicate) {
