@@ -149,9 +149,10 @@ body {
 
 .detail-panel {
   background-color: var(--color-surface);
-  overflow-y: auto;
+  overflow: hidden; /* Changed from overflow-y: auto */
   display: flex;
   flex-direction: column;
+  height: 100%; /* Ensure it takes full height */
 }
 
 /* ====== HEADER ====== */

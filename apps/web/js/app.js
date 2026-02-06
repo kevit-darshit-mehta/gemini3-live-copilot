@@ -199,7 +199,17 @@ class SupervisorDashboard {
         break;
 
       case "ai_response":
+        console.log(
+          "[DEBUG] AI response received:",
+          message.sessionId,
+          "selected:",
+          this.selectedSessionId,
+        );
         if (message.data.type === "text") {
+          console.log(
+            "[DEBUG] Adding AI message:",
+            message.data.content.substring(0, 50),
+          );
           this.addMessageToTranscript(
             message.sessionId,
             "ai",
