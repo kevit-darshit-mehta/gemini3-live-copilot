@@ -26,6 +26,9 @@ Monitor all active calls with live transcripts, sentiment analysis, and analytic
 🎯 **Smart Escalation**  
 AI detects customer frustration and alerts supervisors to intervene
 
+💉 **Live Context Injection**  
+Supervisors can "whisper" guidance to the AI in real-time without interrupting the flow
+
 🔄 **Seamless Human Takeover**  
 Supervisors can instantly take control of conversations with zero latency
 
@@ -58,7 +61,7 @@ Powers natural, bidirectional voice communication with sub-second latency. Tradi
 - WebSocket connection to Gemini Live API
 - Streaming PCM audio (16kHz, 16-bit)
 - Real-time transcription of both AI and customer speech
-- Context injection mid-conversation for supervisor handback
+- Context injection mid-conversation for steering AI responses
 
 #### 2. **Gemini Text API** – Sentiment Analysis
 
