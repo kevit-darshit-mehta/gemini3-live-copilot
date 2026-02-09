@@ -30,7 +30,7 @@ Live Support Co-Pilot is a **real-time AI voice assistant** with live supervisor
 - **Voice synthesis:** Natural-sounding AI responses
 - **Context injection:** Supervisor can inject context mid-conversation during handback
 
-**Implementation:** [`apps/api/gemini-live.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-live.js)
+**Implementation:** [`apps/api/gemini-live.js`](apps/api/gemini-live.js)
 
 ```javascript
 // WebSocket connection to Gemini Live API
@@ -75,7 +75,7 @@ Traditional speech-to-text → LLM → text-to-speech pipelines introduce 3-5 se
 - **Intent detection:** Complaint, inquiry, support, purchase, etc.
 - **Escalation risk assessment:** Low, medium, high
 
-**Implementation:** [`apps/api/gemini-text.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-text.js#L30-L123)
+**Implementation:** [`apps/api/gemini-text.js`](apps/api/gemini-text.js#L30-L123)
 
 ```javascript
 async analyzeConversation(transcript) {
@@ -114,7 +114,7 @@ async analyzeConversation(transcript) {
 - **Action item extraction:** Identifies follow-up tasks
 - **Sentiment summary:** Overall call sentiment and trends
 
-**Implementation:** [`apps/api/gemini-text.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-text.js#L168-L235)
+**Implementation:** [`apps/api/gemini-text.js`](apps/api/gemini-text.js#L168-L235)
 
 ```javascript
 async generateSummary(transcript) {
@@ -248,21 +248,21 @@ sequenceDiagram
 
 ### Backend Components
 
-| Component               | File                                                                                                                                            | Purpose                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **WebSocket Server**    | [`apps/api/index.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/index.js)                               | Manages real-time connections for customer, supervisor, and Gemini |
-| **Gemini Live Session** | [`apps/api/gemini-live.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-live.js)                   | Handles Gemini Live API WebSocket connection and audio streaming   |
-| **Gemini Text Client**  | [`apps/api/gemini-text.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-text.js)                   | Sentiment analysis and summarization using Gemini Text API         |
-| **Session Manager**     | [`apps/api/conversation-manager.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/conversation-manager.js) | Manages active sessions, transcripts, and mode (AI/human)          |
-| **Database**            | [`apps/api/database-manager.js`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/database-manager.js)         | Persists call summaries and session data to SQLite                 |
+| Component               | File                                                                   | Purpose                                                            |
+| ----------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **WebSocket Server**    | [`apps/api/index.js`](apps/api/index.js)                               | Manages real-time connections for customer, supervisor, and Gemini |
+| **Gemini Live Session** | [`apps/api/gemini-live.js`](apps/api/gemini-live.js)                   | Handles Gemini Live API WebSocket connection and audio streaming   |
+| **Gemini Text Client**  | [`apps/api/gemini-text.js`](apps/api/gemini-text.js)                   | Sentiment analysis and summarization using Gemini Text API         |
+| **Session Manager**     | [`apps/api/conversation-manager.js`](apps/api/conversation-manager.js) | Manages active sessions, transcripts, and mode (AI/human)          |
+| **Database**            | [`apps/api/database-manager.js`](apps/api/database-manager.js)         | Persists call summaries and session data to SQLite                 |
 
 ### Frontend Components
 
-| Component                | File                                                                                                                          | Purpose                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| **Supervisor Dashboard** | [`apps/web/index.html`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/web/index.html)         | 3-pane dashboard for monitoring sessions and takeover |
-| **Customer Interface**   | [`apps/web/customer.html`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/web/customer.html)   | Phone-style UI for customer calls                     |
-| **Call Summaries**       | [`apps/web/summaries.html`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/web/summaries.html) | Post-call analytics and summaries                     |
+| Component                | File                                                 | Purpose                                               |
+| ------------------------ | ---------------------------------------------------- | ----------------------------------------------------- |
+| **Supervisor Dashboard** | [`apps/web/index.html`](apps/web/index.html)         | 3-pane dashboard for monitoring sessions and takeover |
+| **Customer Interface**   | [`apps/web/customer.html`](apps/web/customer.html)   | Phone-style UI for customer calls                     |
+| **Call Summaries**       | [`apps/web/summaries.html`](apps/web/summaries.html) | Post-call analytics and summaries                     |
 
 ---
 
@@ -289,7 +289,7 @@ sequenceDiagram
 | Audio stream failure  | Switch to text-only mode                           |
 | Sentiment API failure | Keyword-based fallback intent detection            |
 
-**Example:** Fallback Intent Detection ([`gemini-text.js:125-160`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-text.js#L125-L160))
+**Example:** Fallback Intent Detection ([`gemini-text.js:125-160`](apps/api/gemini-text.js#L125-L160))
 
 ```javascript
 detectIntentFromKeywords(text) {
@@ -315,12 +315,12 @@ detectIntentFromKeywords(text) {
 ### 1. **Echo Detection**
 
 - **Problem:** AI's voice gets picked up by microphone, creating feedback loop
-- **Solution:** Track recent AI responses and filter matching customer input ([`gemini-live.js:108-111`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/gemini-live.js#L108-L111))
+- **Solution:** Track recent AI responses and filter matching customer input ([`gemini-live.js:108-111`](apps/api/gemini-live.js#L108-L111))
 
 ### 2. **Fuzzy Deduplication**
 
 - **Problem:** Web Speech API and Gemini transcription create duplicate messages
-- **Solution:** 60% word overlap detection instead of exact match ([`index.js:300-325`](file:///home/dell/projects/Kevit Internal/hackathon/gemini3-live-copilot/apps/api/index.js#L300-L325))
+- **Solution:** 60% word overlap detection instead of exact match ([`index.js:300-325`](apps/api/index.js#L300-325))
 
 ### 3. **Audio Buffering**
 
