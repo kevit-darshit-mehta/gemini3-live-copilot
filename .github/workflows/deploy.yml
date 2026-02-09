@@ -39,7 +39,7 @@ jobs:
 
                     # Restart the existing PM2 process
                     echo "Restarting PM2 process..."
-                    pm2 restart ecosystem.config.js --only bptl-gemini-copilot-api || pm2 start ecosystem.config.js --only bptl-gemini-copilot-api
+                    pm2 restart ecosystem.config.cjs --only bptl-gemini-copilot-api || pm2 start ecosystem.config.cjs --only bptl-gemini-copilot-api
                     pm2 save
 
                     # Health check
