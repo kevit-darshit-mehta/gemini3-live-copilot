@@ -155,7 +155,9 @@ class DatabaseManager {
   }
 
   /**
-   * Cache analytics update
+   * Cache analytics update for a session
+   * @param {string} sessionId - Session ID
+   * @param {Object} analytics - Analytics data object
    */
   async cacheAnalytics(sessionId, analytics) {
     await this.db.run(
@@ -178,7 +180,9 @@ class DatabaseManager {
   }
 
   /**
-   * Cache coaching update
+   * Cache coaching update for a session
+   * @param {string} sessionId - Session ID
+   * @param {Object} coaching - Coaching data object
    */
   async cacheCoaching(sessionId, coaching) {
     await this.db.run(

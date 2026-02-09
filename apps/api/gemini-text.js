@@ -100,8 +100,7 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
       }
 
       logger.warn(
-        "Could not parse analysis response. Full response:",
-        responseText.substring(0, 500),
+        "Could not parse analysis response, falling back to keywords.",
       );
 
       // Fallback: keyword-based intent detection
@@ -451,7 +450,7 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
 
       if (parsed && parsed.intent) {
         logger.info(
-          `[Summary] ✅ Call summary generated: intent="${parsed.intent}", sentiment="${parsed.sentiment}", resolution="${parsed.resolutionStatus}"`,
+          `[Summary] ✅ Generated: intent="${parsed.intent}", sentiment="${parsed.sentiment}"`,
         );
         return {
           sentiment: parsed.sentiment || "neutral",

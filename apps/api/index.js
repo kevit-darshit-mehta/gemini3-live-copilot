@@ -195,16 +195,20 @@ app.post("/api/summary", async (req, res) => {
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const role = url.searchParams.get("role") || "customer";
+  // Generate a new session ID if one isn't provided (new customer call)
   const sessionId = url.searchParams.get("session") || crypto.randomUUID();
 
-  logger.info(`New connection: role=${role}, session=${sessionId}`);
+  logger.info(
+    `[Connection] New WebSocket connection: role=${role}, session=${sessionId}`,
+  );
 
-  // Handle different connection types
+  // Handle different connection types based on role
   if (role === "customer") {
     handleCustomerConnection(ws, sessionId);
   } else if (role === "supervisor") {
     handleSupervisorConnection(ws, sessionId);
   } else {
+    logger.warn(`[Connection] Rejected connection with invalid role: ${role}`);
     ws.close(1008, "Invalid role");
     return;
   }
@@ -291,8 +295,13 @@ function handleCustomerConnection(ws, sessionId) {
           .trim();
       };
 
-      // Deduplication: Check if this message was recently added (within last 3 seconds)
-      // to prevent duplicates from both Web Speech API and Gemini inputTranscription
+      // Deduplication Logic:
+      // We receive transcriptions from two sources:
+      // 1. Web Speech API (running in customer's browser) - faster, used for immediate feedback
+      // 2. Gemini Live API (server-side) - more accurate, but slightly delayed
+      // We need to prevent showing the same message twice.
+
+      // Check if this message was recently added (within last 3 seconds)
       const now = Date.now();
       const recentMessages = session.transcript.filter(
         (msg) => msg.role === "customer" && now - msg.timestamp < 3000,
@@ -310,10 +319,10 @@ function handleCustomerConnection(ws, sessionId) {
           .split(" ")
           .filter((w) => w.length > 2);
 
-        // Exact match
+        // 1. Exact match check
         if (normalizedExisting === normalizedCustomerText) return true;
 
-        // Fuzzy match: if 60% of words overlap, consider it duplicate
+        // 2. Fuzzy match: if 60% of words overlap, consider it duplicate
         if (customerWords.length >= 3 && existingWords.length >= 3) {
           const commonWords = customerWords.filter((w) =>
             existingWords.includes(w),
@@ -324,7 +333,7 @@ function handleCustomerConnection(ws, sessionId) {
           if (overlapRatio >= 0.6) return true;
         }
 
-        // Substring match for shorter phrases
+        // 3. Substring match for shorter phrases
         if (
           normalizedExisting.includes(normalizedCustomerText) ||
           normalizedCustomerText.includes(normalizedExisting)
@@ -337,12 +346,15 @@ function handleCustomerConnection(ws, sessionId) {
 
       if (isDuplicate) {
         logger.debug(
-          `[Gemini] Skipped duplicate input transcription: "${customerText}"`,
+          `[Deduplication] Skipped duplicate input transcription: "${customerText}"`,
         );
         return; // Skip processing duplicate
       }
 
-      // Echo detection: Check if this matches any recent AI response
+      // Echo Detection Logic:
+      // When the user is on speakerphone, the microphone might pick up the AI's response.
+      // We need to detect if the "user input" is actually just the AI's previous response.
+
       const recentAIMessages = session.transcript.filter(
         (msg) => msg.role === "ai" && Date.now() - msg.timestamp < 10000,
       );
@@ -351,10 +363,10 @@ function handleCustomerConnection(ws, sessionId) {
         const normalizedAI = normalizeText(msg.content);
         const aiWords = normalizedAI.split(" ").filter((w) => w.length > 2);
 
-        // Exact match
+        // 1. Exact match
         if (normalizedAI === normalizedCustomerText) return true;
 
-        // Fuzzy match: if 60% of words overlap
+        // 2. Fuzzy match: if 60% of words overlap
         if (customerWords.length >= 3 && aiWords.length >= 3) {
           const commonWords = customerWords.filter((w) => aiWords.includes(w));
           const overlapRatio =
@@ -362,7 +374,7 @@ function handleCustomerConnection(ws, sessionId) {
           if (overlapRatio >= 0.6) return true;
         }
 
-        // Substring match
+        // 3. Substring match
         if (
           normalizedAI.includes(normalizedCustomerText) ||
           normalizedCustomerText.includes(normalizedAI)
@@ -375,7 +387,7 @@ function handleCustomerConnection(ws, sessionId) {
 
       if (isAIEcho) {
         logger.info(
-          `[ECHO DETECTED] Skipping AI echo from customer: "${customerText.substring(0, 50)}..."`,
+          `[Echo Detection] Skipping AI echo from customer input: "${customerText.substring(0, 50)}..."`,
         );
         return; // Skip - this is the AI's own voice being picked up
       }

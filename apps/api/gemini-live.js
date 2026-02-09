@@ -232,23 +232,6 @@ Note: Always respond in English. If you detect non-English input, respond natura
         response = JSON.parse(data);
       }
 
-      // DEBUG: Log what we receive from Gemini
-      logger.info(
-        `[DEBUG] Response top-level keys: ${Object.keys(response).join(", ")}`,
-      );
-      if (response.serverContent) {
-        const contentKeys = Object.keys(response.serverContent);
-        logger.info(`[DEBUG] Gemini response keys: ${contentKeys.join(", ")}`);
-        // If we see inputTranscription, dump it fully
-        if (response.serverContent.inputTranscription) {
-          logger.info(
-            `[DEBUG] *** INPUT TRANSCRIPTION FOUND: ${JSON.stringify(response.serverContent.inputTranscription)}`,
-          );
-        }
-      }
-
-      // ... (rest of handleMessage) ...
-
       // Handle ServerContent (Audio/Text)
       if (response.serverContent) {
         const content = response.serverContent;
@@ -348,18 +331,6 @@ Note: Always respond in English. If you detect non-English input, respond natura
         }
 
         // ... (Input transcription handling remains same) ...
-        // DEBUG: Check all keys in content for inputTranscription
-        if (
-          Object.keys(content).some(
-            (k) =>
-              k.toLowerCase().includes("input") ||
-              k.toLowerCase().includes("transcript"),
-          )
-        ) {
-          logger.info(
-            `[DEBUG] Found input-related key in content: ${Object.keys(content).join(", ")}`,
-          );
-        }
         if (content.inputTranscription) {
           const customerText = content.inputTranscription.text;
           logger.info(`[TRANSCRIPTION] Received: "${customerText}"`);

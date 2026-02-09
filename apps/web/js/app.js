@@ -187,7 +187,6 @@ class SupervisorDashboard {
   }
 
   handleMessage(message) {
-    console.log("[WS] Received:", message.type);
 
     switch (message.type) {
       case "sessions_list":
@@ -199,17 +198,7 @@ class SupervisorDashboard {
         break;
 
       case "ai_response":
-        console.log(
-          "[DEBUG] AI response received:",
-          message.sessionId,
-          "selected:",
-          this.selectedSessionId,
-        );
         if (message.data.type === "text") {
-          console.log(
-            "[DEBUG] Adding AI message:",
-            message.data.content.substring(0, 50),
-          );
           this.addMessageToTranscript(
             message.sessionId,
             "ai",
@@ -636,8 +625,6 @@ class SupervisorDashboard {
             this.ws &&
             this.selectedSessionId
           ) {
-            console.log("[Supervisor Speech] Transcribed:", transcript);
-            // Send transcribed text for transcript display
             this.ws.send(
               JSON.stringify({
                 type: "supervisor_speech",
@@ -659,7 +646,6 @@ class SupervisorDashboard {
         };
 
         this.recognition.start();
-        console.log("[Supervisor Speech] Recognition started");
       }
 
       await this.audioManager.startRecording((pcmData) => {
@@ -696,7 +682,6 @@ class SupervisorDashboard {
     if (this.recognition) {
       this.recognition.stop();
       this.recognition = null;
-      console.log("[Supervisor Speech] Recognition stopped");
     }
 
     // Update UI

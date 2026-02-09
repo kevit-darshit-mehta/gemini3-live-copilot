@@ -3,6 +3,10 @@
  * Manages active customer support sessions
  */
 
+import { Logger } from "@gemini-copilot/shared";
+
+const logger = new Logger("ConversationManager");
+
 export class ConversationManager {
   constructor() {
     this.sessions = new Map();
@@ -32,7 +36,7 @@ export class ConversationManager {
     };
 
     this.sessions.set(sessionId, session);
-    console.log(`[ConversationManager] Created session: ${sessionId}`);
+    logger.info(`Created session: ${sessionId}`);
     return session;
   }
 
@@ -66,7 +70,7 @@ export class ConversationManager {
         session.geminiSession.close();
       }
       this.sessions.delete(sessionId);
-      console.log(`[ConversationManager] Deleted session: ${sessionId}`);
+      logger.info(`Deleted session: ${sessionId}`);
       return true;
     }
     return false;
@@ -123,9 +127,7 @@ export class ConversationManager {
    */
   addSupervisor(ws) {
     this.supervisors.add(ws);
-    console.log(
-      `[ConversationManager] Supervisor added (total: ${this.supervisors.size})`,
-    );
+    logger.info(`Supervisor added (total: ${this.supervisors.size})`);
   }
 
   /**
@@ -133,9 +135,7 @@ export class ConversationManager {
    */
   removeSupervisor(ws) {
     this.supervisors.delete(ws);
-    console.log(
-      `[ConversationManager] Supervisor removed (total: ${this.supervisors.size})`,
-    );
+    logger.info(`Supervisor removed (total: ${this.supervisors.size})`);
   }
 
   /**
