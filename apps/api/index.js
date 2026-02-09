@@ -42,7 +42,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(join(__dirname, "../public")));
+// Serve static files from web app
+app.use(express.static(join(__dirname, "../web")));
 
 // API Routes
 app.get("/api/health", (req, res) => {

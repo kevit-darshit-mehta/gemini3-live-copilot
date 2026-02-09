@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx serve -l 8080 ."
+    "dev": "echo 'Frontend is served by backend at http://localhost:3000'"
   },
   "dependencies": {
     "serve": "^14.2.0"

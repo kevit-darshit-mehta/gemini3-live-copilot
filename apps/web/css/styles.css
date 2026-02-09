@@ -714,6 +714,50 @@ body {
   font-size: var(--text-base);
 }
 
+/* Premium Glass Button (for Call Summaries) */
+.btn-glass-premium {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  text-decoration: none !important; /* Force remove underline */
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.btn-glass-premium:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 15px var(--color-primary-glow);
+  transform: translateY(-1px);
+  color: white;
+}
+
+.btn-glass-premium::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transform: translateX(-100%);
+  transition: 0.5s;
+}
+
+.btn-glass-premium:hover::before {
+  transform: translateX(100%);
+}
+
 /* ====== EMPTY STATE ====== */
 .empty-state {
   flex: 1;

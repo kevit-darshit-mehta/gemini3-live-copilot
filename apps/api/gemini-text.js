@@ -103,23 +103,135 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
         "Could not parse analysis response. Full response:",
         responseText.substring(0, 500),
       );
+
+      // Fallback: keyword-based intent detection
+      const fallbackIntent = this.detectIntentFromKeywords(conversationText);
       return {
         sentiment: "neutral",
         sentimentScore: 50,
-        intent: "unknown",
+        intent: fallbackIntent,
         keyIssues: [],
         escalationRisk: "low",
       };
     } catch (error) {
       logger.error("Error analyzing conversation:", error.message);
+      // Fallback: keyword-based intent detection
+      const fallbackIntent = this.detectIntentFromKeywords(
+        transcript.map((m) => m.content).join(" "),
+      );
       return {
         sentiment: "neutral",
         sentimentScore: 50,
-        intent: "unknown",
+        intent: fallbackIntent,
         keyIssues: [],
         escalationRisk: "low",
       };
     }
+  }
+
+  /**
+   * Keyword-based fallback intent detection
+   * Used when Gemini API fails or returns unparseable response
+   */
+  detectIntentFromKeywords(text) {
+    const lowerText = text.toLowerCase();
+
+    // Intent patterns with priority order
+    const intentPatterns = [
+      {
+        intent: "complaint",
+        keywords: [
+          "complain",
+          "terrible",
+          "worst",
+          "awful",
+          "unacceptable",
+          "disappointed",
+          "angry",
+          "furious",
+          "hate",
+          "never work",
+        ],
+      },
+      {
+        intent: "cancellation",
+        keywords: [
+          "cancel",
+          "unsubscribe",
+          "terminate",
+          "end my",
+          "stop my",
+          "close my account",
+        ],
+      },
+      {
+        intent: "purchase",
+        keywords: [
+          "buy",
+          "purchase",
+          "order",
+          "pricing",
+          "cost",
+          "how much",
+          "subscribe",
+          "sign up",
+        ],
+      },
+      {
+        intent: "support",
+        keywords: [
+          "help",
+          "issue",
+          "problem",
+          "not working",
+          "broken",
+          "fix",
+          "trouble",
+          "error",
+          "stuck",
+        ],
+      },
+      {
+        intent: "inquiry",
+        keywords: [
+          "what is",
+          "how do",
+          "where can",
+          "when will",
+          "tell me about",
+          "information",
+          "question",
+          "wondering",
+        ],
+      },
+      {
+        intent: "feedback",
+        keywords: [
+          "suggestion",
+          "feedback",
+          "improve",
+          "recommend",
+          "better if",
+          "would be nice",
+        ],
+      },
+    ];
+
+    for (const pattern of intentPatterns) {
+      if (pattern.keywords.some((keyword) => lowerText.includes(keyword))) {
+        logger.info(
+          `[Fallback] Detected intent '${pattern.intent}' from keywords`,
+        );
+        return pattern.intent;
+      }
+    }
+
+    // If conversation has content but no clear intent, default to inquiry
+    if (text.length > 20) {
+      return "inquiry";
+    }
+
+    return "unknown";
   }
 
   /**
