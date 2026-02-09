@@ -104,9 +104,9 @@ Customer service is **broken**:
 
 Traditional solutions fail:
 
-- ❌ **Pure chatbots** are rigid and frustrate customers
-- ❌ **Human agents** are expensive and don't scale
-- ❌ **No middle ground** exists
+- ❌ **Static Chatbots** provide speed without intelligence
+- ❌ **Human Agents** provide empathy without scale
+- ❌ **Customers** are forced to choose between the two
 
 ### Our Solution
 

@@ -312,10 +312,17 @@ detectIntentFromKeywords(text) {
 
 ## 🚀 Performance Optimizations
 
-### 1. **Echo Detection**
+### 1.- **Echo Detection (Gemini Live)**:
 
-- **Problem:** AI's voice gets picked up by microphone, creating feedback loop
-- **Solution:** Track recent AI responses and filter matching customer input ([`gemini-live.js:108-111`](apps/api/gemini-live.js#L108-L111))
+- Stores last 10s of AI audio output.
+- Fuzzy-matches incoming user audio against AI output.
+- Prevents AI form hearing itself (crucial for speakerphone usage). ([`gemini-live.js:108-111`](apps/api/gemini-live.js#L108-L111))
+
+- **Context Injection (Supervisor Override)**:
+  - Supervisor sends `context_injection` message via WebSocket.
+  - Backend creates a specialized user message: `[SYSTEM_INSTRUCTION] <context>`
+  - This is injected into the conversation stream invisibly to the customer.
+  - Gemini adapts its next response based on this injected context.
 
 ### 2. **Fuzzy Deduplication**
 
