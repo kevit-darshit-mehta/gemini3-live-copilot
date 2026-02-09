@@ -228,7 +228,7 @@ class SummariesPage {
         <div class="card-metrics">
           <div class="metric-box">
             <span class="metric-label">Duration</span>
-            <div class="metric-value">${duration.split(" ")[0]}</div>
+            <div class="metric-value">${duration}</div>
           </div>
           <div class="metric-box">
             <span class="metric-label">Msgs</span>
@@ -306,7 +306,7 @@ class SummariesPage {
                  <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; text-transform: uppercase;">Avg Frustration</div>
               </div>
               <div class="metric-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.1);">
-                 <div style="font-size: 2.5rem; color: #10B981; font-weight: 700;">${this.formatDuration(summary.duration || 0).split(" ")[0]}</div>
+                 <div style="font-size: 2.5rem; color: #10B981; font-weight: 700;">${this.formatDuration(summary.duration || 0)}</div>
                  <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; text-transform: uppercase;">Duration</div>
               </div>
               <div class="metric-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.1);">

@@ -17,9 +17,11 @@ export class ConversationManager {
    * Create a new session
    */
   createSession(sessionId) {
+    const now = Date.now();
     const session = {
       id: sessionId,
-      createdAt: Date.now(),
+      createdAt: now,
+      startedAt: now,
       status: "waiting",
       mode: "ai", // 'ai' or 'human'
       customerWs: null,
@@ -36,7 +38,7 @@ export class ConversationManager {
     };
 
     this.sessions.set(sessionId, session);
-    logger.info(`Created session: ${sessionId}`);
+    logger.info(`Created session: ${sessionId} at ${new Date(now).toISOString()}`);
     return session;
   }
 

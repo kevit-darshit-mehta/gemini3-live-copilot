@@ -857,16 +857,16 @@ function handleCustomerConnection(ws, sessionId) {
             : session.frustrationLevel || 0;
 
         // Calculate duration explicitly
-        const duration = session.createdAt
-          ? Math.max(0, Date.now() - session.createdAt)
-          : 0;
+        const now = Date.now();
+        const startTime = session.createdAt || session.startedAt || now;
+        const duration = Math.max(0, now - startTime);
 
-        if (!session.createdAt) {
+        if (!session.createdAt && !session.startedAt) {
           logger.warn(
-            `Session ${sessionId} missing createdAt timestamp. Duration defaulted to 0.`,
+            `Session ${sessionId} missing createdAt/startedAt timestamp. Duration defaulted to 0.`,
           );
         } else {
-          logger.info(`Session ${sessionId} duration: ${duration}ms`);
+          logger.info(`Session ${sessionId} duration: ${duration}ms (${Math.round(duration/1000)}s)`);
         }
 
         // Prepare session data with metrics
