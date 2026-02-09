@@ -1,0 +1,51 @@
+name: Deploy to Production
+
+on:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    deploy-production:
+        runs-on: ubuntu-latest
+
+        steps:
+            # 1. Set up SSH with the private key stored in GitHub secrets
+            - name: Set up SSH
+              run: |
+                  mkdir -p /home/runner/.ssh
+                  echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > /home/runner/.ssh/id_rsa
+                  chmod 600 /home/runner/.ssh/id_rsa
+                  ssh-keyscan -p ${{ secrets.PROD_SSH_PORT }} -H ${{ secrets.PROD_SSH_HOST }} >> /home/runner/.ssh/known_hosts
+
+            # 2. SSH into the server and deploy
+            - name: Deploy Application
+              run: |
+                  echo "Logging into the server..."
+                  ssh -p ${{ secrets.PROD_SSH_PORT }} -i /home/runner/.ssh/id_rsa ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }} << 'EOF'
+                    echo "Logged into the server"
+
+                    # Navigate to the project directory
+                    cd ${{ secrets.PROD_PROJECT_PATH }}
+
+                    # Reset any local changes and pull the latest code
+                    git checkout main
+                    git fetch origin
+                    git reset --hard origin/main
+
+                    # Install dependencies
+                    npm ci --production
+
+                    # Restart the existing PM2 process
+                    echo "Restarting PM2 process..."
+                    pm2 restart ecosystem.config.js --only bptl-gemini-copilot-api || pm2 start ecosystem.config.js --only bptl-gemini-copilot-api
+                    pm2 save
+
+                    # Health check
+                    echo "Running health check..."
+                    sleep 3
+                    pm2 status
+
+                    echo "✅ Deployment completed successfully!"
+                  EOF
