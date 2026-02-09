@@ -176,16 +176,16 @@
           await this.audioManager.initialize();
           
           // 2. Connect WebSocket
+          // 2. Connect WebSocket
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          const host = window.location.hostname;
-          const port = window.location.port || (window.location.protocol === 'https:' ? 443 : 80);
+          const host = window.location.host;
           
           // Generate Session ID if needed
           if (!this.sessionId) {
               this.sessionId = crypto.randomUUID();
           }
 
-          const wsUrl = `${protocol}//${host}:3000?role=customer&session=${this.sessionId}`;
+          const wsUrl = `${protocol}//${host}?role=customer&session=${this.sessionId}`;
           console.log('Connecting to:', wsUrl);
 
           this.ws = new WebSocket(wsUrl);

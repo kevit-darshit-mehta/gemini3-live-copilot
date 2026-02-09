@@ -106,9 +106,9 @@ class SupervisorDashboard {
 
   connectWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    // Use explicit 3000 port for backend connection
-    const host = window.location.hostname;
-    const wsUrl = `${protocol}//${host}:3000?role=supervisor`;
+    // Use dynamic host (including port) for backend connection
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}?role=supervisor`;
 
     this.ws = new WebSocket(wsUrl);
 
@@ -187,7 +187,6 @@ class SupervisorDashboard {
   }
 
   handleMessage(message) {
-
     switch (message.type) {
       case "sessions_list":
         this.updateSessionsList(message.sessions);
@@ -469,10 +468,8 @@ class SupervisorDashboard {
 
   async fetchTranscript(sessionId) {
     try {
-      const host = window.location.hostname;
-      const response = await fetch(
-        `http://${host}:3000/api/sessions/${sessionId}`,
-      );
+      // Use relative path for API calls
+      const response = await fetch(`/api/sessions/${sessionId}`);
       if (!response.ok) throw new Error("Failed to fetch session");
 
       const session = await response.json();
@@ -793,7 +790,7 @@ class SupervisorDashboard {
     this.btnGetCoaching.disabled = true;
 
     try {
-      const response = await fetch("http://localhost:3000/api/coaching", {
+      const response = await fetch("/api/coaching", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

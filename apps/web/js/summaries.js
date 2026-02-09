@@ -3,7 +3,7 @@ class SummariesPage {
     this.summaries = [];
     this.offset = 0;
     this.limit = 20;
-    this.apiBaseUrl = "http://localhost:3000"; // API server
+    this.apiBaseUrl = window.location.origin; // Dynamic API server
     this.filters = {
       sentiment: null,
       intent: null,
