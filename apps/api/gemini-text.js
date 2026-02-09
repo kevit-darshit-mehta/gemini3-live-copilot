@@ -477,14 +477,6 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
         fullText: responseText.substring(0, 200) || "Call completed",
         insights: "",
       };
-    } catch (error) {
-      logger.error(`[Summary] ❌ Error generating summary: ${error.message}`);
-      // Check if it's a rate limit error
-      if (error.message && error.message.includes("quota")) {
-        logger.error(
-          "[Summary] Rate limit exceeded - falling back to basic summary",
-        );
-      }
       return {
         sentiment: "neutral",
         intent: "unknown",
@@ -494,6 +486,43 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
         frustrationTrend: "stable",
         fullText: "Call completed - summary unavailable due to API error",
         insights: "",
+      };
+    } catch (error) {
+      logger.error(`[Summary] ❌ Error generating summary: ${error.message}`);
+
+      // Basic fallback analysis
+      const fullText = transcript.map((m) => m.content).join(" ");
+      const fallbackIntent = this.detectIntentFromKeywords(fullText);
+
+      // Determine basic sentiment from keywords
+      let fallbackSentiment = "neutral";
+      const lowerText = fullText.toLowerCase();
+      if (
+        lowerText.includes("thank") ||
+        lowerText.includes("great") ||
+        lowerText.includes("help")
+      ) {
+        fallbackSentiment = "positive";
+      } else if (
+        lowerText.includes("bad") ||
+        lowerText.includes("terrible") ||
+        lowerText.includes("angry") ||
+        lowerText.includes("slow")
+      ) {
+        fallbackSentiment = "frustrated";
+      }
+
+      return {
+        sentiment: fallbackSentiment,
+        intent: fallbackIntent,
+        resolutionStatus: "unresolved", // Safe default
+        keyTopics: [],
+        actionItems: [],
+        frustrationTrend:
+          fallbackSentiment === "frustrated" ? "increasing" : "stable",
+        fullText:
+          "Summary unavailable due to temporary API issue. Basic metrics extracted from transcript.",
+        insights: "Review transcript for details.",
       };
     }
   }

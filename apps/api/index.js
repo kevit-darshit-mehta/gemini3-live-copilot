@@ -856,9 +856,23 @@ function handleCustomerConnection(ws, sessionId) {
             ? Math.max(...frustrations)
             : session.frustrationLevel || 0;
 
+        // Calculate duration explicitly
+        const duration = session.createdAt
+          ? Math.max(0, Date.now() - session.createdAt)
+          : 0;
+
+        if (!session.createdAt) {
+          logger.warn(
+            `Session ${sessionId} missing createdAt timestamp. Duration defaulted to 0.`,
+          );
+        } else {
+          logger.info(`Session ${sessionId} duration: ${duration}ms`);
+        }
+
         // Prepare session data with metrics
         const sessionData = {
           ...session,
+          duration: duration,
           frustrationAvg: frustrationAvg,
           frustrationMax: frustrationMax,
           escalationCount: session.escalationCount || 0,

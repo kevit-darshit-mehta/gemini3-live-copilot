@@ -42,7 +42,7 @@ Real-time emotional analysis to prevent customer churn
 
 ## 🎥 Demo
 
-> **[Watch 3-Minute Demo Video →](#)** _(Link to be added)_
+> **[Watch 3-Minute Demo Video →](https://www.awesomescreenshot.com/video/49241222?key=2667da2b9fc410965d65e3388e54dac7)**
 
 ---
 

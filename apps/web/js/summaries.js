@@ -275,6 +275,60 @@ class SummariesPage {
     modal.style.cssText =
       "position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1000;";
 
+    // AI Analysis Content
+    const analysisHtml = `
+      <div class="analysis-view" style="padding: 2rem; max-width: 800px; margin: 0 auto;">
+        <h3 style="color: #fff; margin-bottom: 1.5rem;">AI Conversation Analysis</h3>
+        <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.1);">
+           <h4 style="color: var(--accent-primary); margin-bottom: 0.75rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Executive Summary</h4>
+           <div style="color: #e2e8f0; line-height: 1.7; font-size: 1.05rem;">${summary.full_summary || "No summary analysis available for this session."}</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+           <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1);">
+              <h4 style="color: #94a3b8; margin-bottom: 0.5rem; font-size: 0.75rem; text-transform: uppercase;">Primary Intent</h4>
+              <div style="font-size: 1.25rem; color: #fff; font-weight: 500;">${summary.intent || "Unknown"}</div>
+           </div>
+           <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1);">
+              <h4 style="color: #94a3b8; margin-bottom: 0.5rem; font-size: 0.75rem; text-transform: uppercase;">Resolution Outcome</h4>
+              <div style="font-size: 1.25rem; color: ${summary.resolution_status === "resolved" ? "#10B981" : "#F59E0B"}; font-weight: 500;">${summary.resolution_status ? summary.resolution_status.toUpperCase() : "UNKNOWN"}</div>
+           </div>
+        </div>
+      </div>
+    `;
+
+    // Metrics Content
+    const metricsHtml = `
+      <div class="metrics-view" style="padding: 2rem; max-width: 800px; margin: 0 auto;">
+           <h3 style="color: #fff; margin-bottom: 1.5rem;">Session Metrics</h3>
+           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
+              <div class="metric-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.1);">
+                 <div style="font-size: 2.5rem; color: #3B82F6; font-weight: 700;">${Math.round(summary.frustration_avg || 0)}%</div>
+                 <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; text-transform: uppercase;">Avg Frustration</div>
+              </div>
+              <div class="metric-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.1);">
+                 <div style="font-size: 2.5rem; color: #10B981; font-weight: 700;">${this.formatDuration(summary.duration || 0).split(" ")[0]}</div>
+                 <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; text-transform: uppercase;">Duration</div>
+              </div>
+              <div class="metric-card" style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.1);">
+                 <div style="font-size: 2.5rem; color: #8B5CF6; font-weight: 700;">${transcript.length}</div>
+                 <div style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.5rem; text-transform: uppercase;">Total Messages</div>
+              </div>
+           </div>
+           
+           <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1);">
+             <h4 style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.8rem; text-transform: uppercase;">Sentiment Progression</h4>
+             <!-- Simple CSS Bar Chart -->
+             <div style="height: 4px; width: 100%; background: #334155; display: flex; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${summary.overall_sentiment === "positive" ? "100%" : summary.overall_sentiment === "neutral" ? "50%" : "20%"}; background: #10B981; height: 100%;"></div>
+             </div>
+             <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; color: #64748b; font-size: 0.75rem;">
+               <span>Start</span>
+               <span>End (${summary.overall_sentiment})</span>
+             </div>
+           </div>
+      </div>
+    `;
+
     modal.innerHTML = `
       <div class="case-file-modal">
         <!-- Sidebar -->
@@ -310,36 +364,49 @@ class SummariesPage {
         <div class="case-main">
           <div class="case-header">
             <div class="case-tabs">
-              <button class="tab-btn active">TRANSCRIPT LOG</button>
-              <button class="tab-btn">AI ANALYSIS</button>
-              <button class="tab-btn">METRICS</button>
+              <button class="tab-btn active" data-tab="transcript">TRANSCRIPT LOG</button>
+              <button class="tab-btn" data-tab="analysis">AI ANALYSIS</button>
+              <button class="tab-btn" data-tab="metrics">METRICS</button>
             </div>
             <button class="btn btn-ghost" onclick="document.querySelector('.case-file-modal-container').remove()">✕ CLOSE</button>
           </div>
 
           <div class="case-content">
-            <div class="transcript" style="max-width: 800px; margin: 0 auto;">
-              ${transcript
-                .map(
-                  (m) => `
-                <div class="message" style="margin-bottom: 1.5rem; display: flex; flex-direction: column; align-items: ${m.role === "customer" ? "flex-start" : "flex-end"}">
-                  <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">${m.role.toUpperCase()} • ${new Date(m.timestamp).toLocaleTimeString()}</div>
-                  <div style="
-                    padding: 1rem 1.5rem; 
-                    background: ${m.role === "customer" ? "rgba(255,255,255,0.05)" : "rgba(59, 130, 246, 0.1)"}; 
-                    border: 1px solid ${m.role === "customer" ? "rgba(255,255,255,0.1)" : "rgba(59, 130, 246, 0.2)"};
-                    border-radius: 1rem; 
-                    border-top-${m.role === "customer" ? "left" : "right"}-radius: 0;
-                    max-width: 80%;
-                    color: #e2e8f0;
-                    line-height: 1.6;
-                  ">
-                    ${m.content}
-                  </div>
+            <!-- 1. Transcript Tab -->
+            <div id="tab-transcript" class="tab-content" style="display: block;">
+                <div class="transcript" style="max-width: 800px; margin: 0 auto;">
+                ${transcript
+                  .map(
+                    (m) => `
+                    <div class="message" style="margin-bottom: 1.5rem; display: flex; flex-direction: column; align-items: ${m.role === "customer" ? "flex-start" : "flex-end"}">
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">${m.role.toUpperCase()} • ${new Date(m.timestamp).toLocaleTimeString()}</div>
+                    <div style="
+                        padding: 1rem 1.5rem; 
+                        background: ${m.role === "customer" ? "rgba(255,255,255,0.05)" : "rgba(59, 130, 246, 0.1)"}; 
+                        border: 1px solid ${m.role === "customer" ? "rgba(255,255,255,0.1)" : "rgba(59, 130, 246, 0.2)"};
+                        border-radius: 1rem; 
+                        border-top-${m.role === "customer" ? "left" : "right"}-radius: 0;
+                        max-width: 80%;
+                        color: #e2e8f0;
+                        line-height: 1.6;
+                    ">
+                        ${m.content}
+                    </div>
+                    </div>
+                `,
+                  )
+                  .join("")}
                 </div>
-              `,
-                )
-                .join("")}
+            </div>
+
+            <!-- 2. Analysis Tab -->
+            <div id="tab-analysis" class="tab-content" style="display: none;">
+                ${analysisHtml}
+            </div>
+
+            <!-- 3. Metrics Tab -->
+            <div id="tab-metrics" class="tab-content" style="display: none;">
+                ${metricsHtml}
             </div>
           </div>
         </div>
@@ -347,6 +414,29 @@ class SummariesPage {
     `;
 
     document.body.appendChild(modal);
+
+    // Add Tab Switching Logic
+    const tabs = modal.querySelectorAll(".tab-btn");
+    const contents = modal.querySelectorAll(".tab-content");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        // Remove active class from all tabs
+        tabs.forEach((t) => t.classList.remove("active"));
+        // Add active class to clicked tab
+        tab.classList.add("active");
+
+        // Hide all contents
+        contents.forEach((c) => (c.style.display = "none"));
+
+        // Show target content
+        const targetId = `tab-${tab.dataset.tab}`;
+        const targetContent = modal.querySelector(`#${targetId}`);
+        if (targetContent) {
+          targetContent.style.display = "block";
+        }
+      });
+    });
 
     // Close on backdrop click
     modal.addEventListener("click", (e) => {

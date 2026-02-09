@@ -63,7 +63,8 @@ class DatabaseManager {
         sessionId,
         sessionData.createdAt || Date.now(),
         Date.now(),
-        Date.now() - (sessionData.createdAt || Date.now()),
+        sessionData.duration ||
+          Date.now() - (sessionData.createdAt || Date.now()),
         summary.sentiment || "neutral",
         summary.intent || "unknown",
         summary.resolutionStatus || "unresolved",
@@ -80,8 +81,8 @@ class DatabaseManager {
         summary.fullText || "",
         summary.insights || "",
         JSON.stringify(transcript),
-        firstMessage?.timestamp || null,
-        lastMessage?.timestamp || null,
+        firstMessage?.timestamp || firstMessage?.createdAt || null,
+        lastMessage?.timestamp || lastMessage?.createdAt || null,
       ],
     );
 
